@@ -1,0 +1,12 @@
+streamlit
+python-dotenv
+groq
+langgraph
+langchain
+langchain-groq
+langchain-core
+pypdf
+sentence-transformers
+scikit-learn
+pandas
+plotly

@@ -7,9 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from utils.skill_normalizer import normalize_skills
 
-
 load_dotenv()
-
 
 llm = ChatGroq(
     model="openai/gpt-oss-120b",
@@ -21,39 +19,43 @@ llm = ChatGroq(
 def extract_profile(resume_text):
 
     prompt = ChatPromptTemplate.from_template("""
-You are a resume analysis agent.
+You are a professional resume understanding agent.
 
-Analyze the following resume.
+Analyze the resume carefully.
 
 Return ONLY valid JSON.
 
-Resume:
-{resume}
+The JSON must contain these fields:
 
-Use exactly this format:
-
-{{
-    "name": "",
-    "education": [],
-    "skills": [],
-    "projects": [],
-    "certifications": [],
-    "interests": [],
-    "experience": []
-}}
+"name"
+"location"
+"education"
+"skills"
+"projects"
+"certifications"
+"interests"
+"experience"
 
 Rules:
 
 1. Do not invent information.
 2. Extract only information actually present in the resume.
-3. If something is not available, use an empty list or empty string.
-4. Put technical skills inside "skills".
-5. Put academic qualifications inside "education".
-6. Put projects inside "projects".
-7. Put certificates inside "certifications".
-8. Put hobbies or career interests inside "interests".
-9. Put work/internship experience inside "experience".
-10. Return JSON only.
+3. If information is unavailable, use an empty string or empty list.
+4. Put technical skills inside skills.
+5. Put education inside education.
+6. Put projects inside projects.
+7. Put certificates inside certifications.
+8. Put hobbies and career interests inside interests.
+9. Put work and internship experience inside experience.
+10. Extract city, state, or country into location when available.
+11. Return JSON only.
+12. Do not include markdown.
+13. Do not include code fences.
+14. Make sure the response is valid JSON.
+
+Resume:
+
+{resume}
 """)
 
     chain = prompt | llm
@@ -62,21 +64,20 @@ Rules:
         "resume": resume_text
     })
 
-    content = response.content
+    content = response.content.strip()
 
-    # Remove markdown formatting if the model adds it
     content = content.replace("```json", "")
     content = content.replace("```", "")
     content = content.strip()
 
     try:
-
         profile = json.loads(content)
 
     except json.JSONDecodeError:
 
         profile = {
             "name": "",
+            "location": "",
             "education": [],
             "skills": [],
             "projects": [],
@@ -85,7 +86,6 @@ Rules:
             "experience": []
         }
 
-    # Normalize extracted skills
     profile["skills"] = normalize_skills(
         profile.get("skills", [])
     )

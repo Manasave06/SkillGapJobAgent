@@ -1,10 +1,20 @@
 import pandas as pd
 
 
+# =========================================================
+# LOAD COURSES
+# =========================================================
+
 def load_courses():
 
-    return pd.read_csv("data/courses.csv")
+    return pd.read_csv(
+        "data/courses.csv"
+    )
 
+
+# =========================================================
+# RECOMMEND COURSES
+# =========================================================
 
 def recommend_courses(
     missing_skills,
@@ -15,50 +25,106 @@ def recommend_courses(
 
     recommendations = []
 
+
     for skill in missing_skills:
 
         matches = courses[
-            courses["skill"].str.lower()
-            == skill.lower()
+            courses["skill"]
+            .str.lower()
+            .str.strip()
+            ==
+            str(skill)
+            .lower()
+            .strip()
         ]
 
+
         if free_only:
+
             matches = matches[
-                matches["is_free"].astype(str).str.lower()
+                matches["is_free"]
+                .astype(str)
+                .str.lower()
                 == "true"
             ]
 
+
         if len(matches) > 0:
 
-            course = matches.iloc[0]
+            # Select shortest course
+            course = matches.sort_values(
+                "duration_weeks"
+            ).iloc[0]
+
 
             recommendations.append({
+
                 "skill": skill,
-                "course": course["course_name"],
-                "provider": course["provider"],
+
+                "course": course[
+                    "course_name"
+                ],
+
+                "provider": course[
+                    "provider"
+                ],
+
                 "duration_weeks": int(
-                    course["duration_weeks"]
+                    course[
+                        "duration_weeks"
+                    ]
                 ),
-                "cost": float(course["cost"]),
-                "is_free": str(
-                    course["is_free"]
-                ).lower() == "true",
-                "url": course["url"]
+
+                "cost": float(
+                    course[
+                        "cost"
+                    ]
+                ),
+
+                "is_free": (
+                    str(
+                        course[
+                            "is_free"
+                        ]
+                    ).lower()
+                    == "true"
+                ),
+
+                "level": course[
+                    "level"
+                ],
+
+                "url": course[
+                    "url"
+                ]
+
             })
+
 
     return recommendations
 
 
-def calculate_time_and_cost(courses):
+# =========================================================
+# TIME AND COST
+# =========================================================
+
+def calculate_time_and_cost(
+    courses
+):
 
     total_weeks = sum(
         course["duration_weeks"]
         for course in courses
     )
 
+
     total_cost = sum(
         course["cost"]
         for course in courses
     )
 
-    return total_weeks, total_cost
+
+    return (
+        total_weeks,
+        total_cost
+    )

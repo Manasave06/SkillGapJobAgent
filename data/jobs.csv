@@ -1,9 +1,9 @@
-job_id,title,company,location,skills,education,experience,url
-J001,Junior Python Developer,Example Tech,Bengaluru,"python,sql,git,flask,rest api",Bachelors,0-2,
-J002,Frontend Developer,Example Tech,Bengaluru,"html,css,javascript,react,git",Bachelors,0-2,
-J003,Full Stack Developer,Example Tech,Bengaluru,"html,css,javascript,react,node.js,mongodb,git",Bachelors,0-2,
-J004,Data Analyst,Example Tech,Bengaluru,"python,sql,excel,power bi",Bachelors,0-2,
-J005,AI/ML Intern,Example AI,Bengaluru,"python,machine learning,numpy,pandas,git",Bachelors,0-1,
-J006,Backend Developer,Example Software,Bengaluru,"python,sql,rest api,flask,docker,git",Bachelors,0-2,
-J007,Java Developer,Example Systems,Bengaluru,"java,spring,sql,git,rest api",Bachelors,0-2,
-J008,Cloud Developer,Example Cloud,Bengaluru,"python,linux,docker,aws,git",Bachelors,0-2,
+job_id,title,company,location,skills,education,experience,url,last_verified
+J001,Junior Python Developer,Company A,Bengaluru,"python,sql,git,flask,rest api",Bachelors,0-2,https://example.com,2026-09-20
+J002,Frontend Developer,Company B,Bengaluru,"html,css,javascript,react,git",Bachelors,0-2,https://example.com,2026-09-20
+J003,Full Stack Developer,Company C,Bengaluru,"html,css,javascript,react,node.js,mongodb,git",Bachelors,0-2,https://example.com,2026-09-20
+J004,Data Analyst,Company D,Bengaluru,"python,sql,excel,power bi",Bachelors,0-2,https://example.com,2026-09-20
+J005,AI ML Intern,Company E,Bengaluru,"python,machine learning,numpy,pandas,git",Bachelors,0-1,https://example.com,2026-09-20
+J006,Backend Developer,Company F,Bengaluru,"python,sql,rest api,flask,docker,git",Bachelors,0-2,https://example.com,2026-09-20
+J007,Java Developer,Company G,Bengaluru,"java,spring,sql,git,rest api",Bachelors,0-2,https://example.com,2026-09-20
+J008,Cloud Developer,Company H,Bengaluru,"python,linux,docker,aws,git",Bachelors,0-2,https://example.com,2026-09-20
