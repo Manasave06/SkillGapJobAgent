@@ -7,7 +7,19 @@ from utils.skill_normalizer import normalize_skill
 
 
 # =========================================================
-# LOAD EMBEDDING MODEL
+# LOAD JOBS
+# =========================================================
+
+@lru_cache(maxsize=1)
+def load_jobs():
+
+    return pd.read_csv(
+        "data/jobs.csv"
+    )
+
+
+# =========================================================
+# LOAD EMBEDDING MODEL ONLY ONCE
 # =========================================================
 
 @lru_cache(maxsize=1)
@@ -19,303 +31,295 @@ def load_embedding_model():
 
 
 # =========================================================
-# LOAD JOBS
+# NORMALIZE SKILL LIST
 # =========================================================
 
-def load_jobs():
+def prepare_skills(skills):
 
-    return pd.read_csv(
-        "data/jobs.csv"
-    )
+    result = []
+
+    for skill in skills:
+
+        if not skill:
+            continue
+
+        normalized = normalize_skill(
+            str(skill)
+        )
+
+        if normalized not in result:
+
+            result.append(
+                normalized
+            )
+
+    return result
 
 
 # =========================================================
-# SEMANTIC SIMILARITY
+# SEMANTIC MATCHING
 # =========================================================
 
-def semantic_skill_similarity(
+def semantic_matches(
     user_skills,
     required_skills
 ):
 
     if not user_skills or not required_skills:
 
-        return 0, []
-
+        return {}
 
     model = load_embedding_model()
 
-
-    user_skills = [
-        normalize_skill(skill)
-        for skill in user_skills
-    ]
-
-    required_skills = [
-        normalize_skill(skill)
-        for skill in required_skills
-    ]
-
-
     user_embeddings = model.encode(
-        user_skills
+        user_skills,
+        normalize_embeddings=True
     )
 
     required_embeddings = model.encode(
-        required_skills
+        required_skills,
+        normalize_embeddings=True
     )
 
-
-    similarity_matrix = cosine_similarity(
+    matrix = cosine_similarity(
         required_embeddings,
         user_embeddings
     )
 
+    results = {}
 
-    matched_skills = []
-
-    best_scores = []
-
-
-    for index, required_skill in enumerate(
+    for i, required in enumerate(
         required_skills
     ):
 
-        best_index = similarity_matrix[
-            index
-        ].argmax()
+        best_index = matrix[i].argmax()
 
-        best_score = similarity_matrix[
-            index
-        ][best_index]
+        best_score = float(
+            matrix[i][best_index]
+        )
 
         best_user_skill = user_skills[
             best_index
         ]
 
-        best_scores.append(
+        results[required] = (
+            best_user_skill,
             best_score
         )
 
-
-        # Exact match
-        if required_skill == best_user_skill:
-
-            matched_skills.append(
-                required_skill
-            )
-
-        # Semantic match
-        elif best_score >= 0.65:
-
-            matched_skills.append(
-                required_skill
-            )
-
-
-    semantic_score = (
-        sum(best_scores)
-        / len(best_scores)
-    ) * 100
-
-
-    return (
-        round(semantic_score, 2),
-        list(
-            dict.fromkeys(
-                matched_skills
-            )
-        )
-    )
+    return results
 
 
 # =========================================================
-# JOB MATCHING
+# MATCH ONE JOB
+# =========================================================
+
+def calculate_job_match(
+    user_skills,
+    job,
+    candidate_location=""
+):
+
+    user_skills = prepare_skills(
+        user_skills
+    )
+
+    required_skills = [
+        normalize_skill(skill.strip())
+        for skill in str(
+            job["skills"]
+        ).split(",")
+        if skill.strip()
+    ]
+
+    required_skills = list(
+        dict.fromkeys(
+            required_skills
+        )
+    )
+
+    # -----------------------------------------------------
+    # EXACT MATCH
+    # -----------------------------------------------------
+
+    exact_matches = sorted(
+        set(user_skills).intersection(
+            set(required_skills)
+        )
+    )
+
+    # -----------------------------------------------------
+    # SEMANTIC MATCH
+    # -----------------------------------------------------
+
+    semantic_data = semantic_matches(
+        user_skills,
+        required_skills
+    )
+
+    semantic_matches_list = []
+
+    for required in required_skills:
+
+        if required in exact_matches:
+            continue
+
+        if required not in semantic_data:
+            continue
+
+        best_user_skill, score = (
+            semantic_data[required]
+        )
+
+        # High threshold so unrelated skills
+        # are not counted as matches.
+        if score >= 0.82:
+
+            semantic_matches_list.append(
+                required
+            )
+
+    matched_skills = list(
+        dict.fromkeys(
+            exact_matches +
+            semantic_matches_list
+        )
+    )
+
+    # -----------------------------------------------------
+    # MISSING SKILLS
+    # -----------------------------------------------------
+
+    missing_skills = [
+        skill
+        for skill in required_skills
+        if skill not in matched_skills
+    ]
+
+    # -----------------------------------------------------
+    # SKILL COVERAGE
+    # -----------------------------------------------------
+
+    if required_skills:
+
+        skill_coverage = (
+            len(matched_skills)
+            /
+            len(required_skills)
+        ) * 100
+
+    else:
+
+        skill_coverage = 0
+
+    # -----------------------------------------------------
+    # LOCATION
+    # -----------------------------------------------------
+
+    job_location = str(
+        job.get(
+            "location",
+            ""
+        )
+    )
+
+    candidate_location = str(
+        candidate_location or ""
+    )
+
+    if not candidate_location:
+
+        location_fit = 50
+
+    elif (
+        candidate_location.lower()
+        in job_location.lower()
+        or
+        job_location.lower()
+        in candidate_location.lower()
+    ):
+
+        location_fit = 100
+
+    else:
+
+        location_fit = 50
+
+    # -----------------------------------------------------
+    # FINAL SCORE
+    # -----------------------------------------------------
+    #
+    # Skill coverage is the main factor.
+    # Location has a smaller effect.
+    #
+    # 90% skill coverage
+    # 10% location
+    #
+    # This prevents semantic similarity from
+    # artificially inflating the score.
+    # -----------------------------------------------------
+
+    final_score = (
+        skill_coverage * 0.90
+        +
+        location_fit * 0.10
+    )
+
+    return {
+        "job_id": job["job_id"],
+        "title": job["title"],
+        "company": job["company"],
+        "location": job_location,
+        "match_score": round(
+            final_score,
+            1
+        ),
+        "skill_coverage": round(
+            skill_coverage,
+            1
+        ),
+        "location_fit": round(
+            location_fit,
+            1
+        ),
+        "required_skills": required_skills,
+        "matched_skills": matched_skills,
+        "missing_skills": missing_skills,
+        "url": job.get(
+            "url",
+            ""
+        )
+    }
+
+
+# =========================================================
+# MATCH ALL JOBS
 # =========================================================
 
 def match_jobs(
     user_skills,
-    candidate_location=None
+    candidate_location=""
 ):
 
     jobs = load_jobs()
 
     results = []
 
-
-    normalized_user_skills = [
-        normalize_skill(skill)
-        for skill in user_skills
-    ]
-
-
     for _, job in jobs.iterrows():
 
-        required_skills = [
-            skill.strip()
-            for skill in str(
-                job["skills"]
-            ).split(",")
-        ]
-
-
-        normalized_required = [
-            normalize_skill(skill)
-            for skill in required_skills
-        ]
-
-
-        # -------------------------------------------------
-        # EXACT MATCHING
-        # -------------------------------------------------
-
-        exact_matches = set(
-            normalized_user_skills
-        ).intersection(
-            set(normalized_required)
-        )
-
-
-        skill_coverage = (
-            len(exact_matches)
-            / len(normalized_required)
-        ) * 100 if normalized_required else 0
-
-
-        # -------------------------------------------------
-        # SEMANTIC MATCHING
-        # -------------------------------------------------
-
-        semantic_score, semantic_matches = (
-            semantic_skill_similarity(
-                normalized_user_skills,
-                normalized_required
-            )
-        )
-
-
-        # -------------------------------------------------
-        # FINAL MATCH SCORE
-        # -------------------------------------------------
-
-        final_score = (
-            skill_coverage * 0.60
-            + semantic_score * 0.40
-        )
-
-
-        # -------------------------------------------------
-        # MISSING SKILLS
-        # -------------------------------------------------
-
-        matched = list(
-            dict.fromkeys(
-                list(exact_matches)
-                + semantic_matches
-            )
-        )
-
-
-        missing = [
-            skill
-            for skill in normalized_required
-            if skill not in matched
-        ]
-
-
-        # -------------------------------------------------
-        # LOCATION
-        # -------------------------------------------------
-
-        job_location = str(
-            job.get(
-                "location",
-                ""
-            )
-        )
-
-
-        location_fit = 100
-
-
-        if (
+        result = calculate_job_match(
+            user_skills,
+            job,
             candidate_location
-            and candidate_location != "Not specified"
-        ):
+        )
 
-            candidate_location_lower = (
-                str(candidate_location)
-                .lower()
-            )
+        results.append(
+            result
+        )
 
-            job_location_lower = (
-                job_location
-                .lower()
-            )
-
-
-            if (
-                candidate_location_lower
-                in job_location_lower
-                or job_location_lower
-                in candidate_location_lower
-            ):
-
-                location_fit = 100
-
-            else:
-
-                location_fit = 50
-
-
-        # -------------------------------------------------
-        # FINAL RESULT
-        # -------------------------------------------------
-
-        results.append({
-
-            "job_id": job["job_id"],
-
-            "title": job["title"],
-
-            "company": job["company"],
-
-            "location": job_location,
-
-            "match_score": round(
-                final_score,
-                2
-            ),
-
-            "skill_coverage": round(
-                skill_coverage,
-                2
-            ),
-
-            "semantic_similarity": round(
-                semantic_score,
-                2
-            ),
-
-            "location_fit": location_fit,
-
-            "matched_skills": matched,
-
-            "missing_skills": missing,
-
-            "url": job.get(
-                "url",
-                ""
-            )
-
-        })
-
-
-    # Highest score first
     results.sort(
         key=lambda x: x["match_score"],
         reverse=True
     )
-
 
     return results

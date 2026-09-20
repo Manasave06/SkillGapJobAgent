@@ -3,51 +3,37 @@ def opportunity_unlock(
     current_skills
 ):
 
-    current_skills = set(
-        skill.lower()
+    current_skills = {
+        skill.lower().strip()
         for skill in current_skills
-    )
+    }
 
-
-    skill_impact = {}
-
+    results = []
 
     for job in jobs:
 
-        missing = set(
-            skill.lower()
-            for skill in job["missing_skills"]
-        )
-
+        missing = {
+            skill.lower().strip()
+            for skill in job.get(
+                "missing_skills",
+                []
+            )
+        }
 
         for skill in missing:
 
-            if skill not in skill_impact:
+            if skill in current_skills:
+                continue
 
-                skill_impact[skill] = 0
+            results.append(
+                {
+                    "Skill": skill,
+                    "Job": job["title"],
+                    "Company": job["company"],
+                    "Current Match": job[
+                        "match_score"
+                    ]
+                }
+            )
 
-            skill_impact[skill] += 1
-
-
-    result = []
-
-
-    for skill, count in skill_impact.items():
-
-        result.append({
-
-            "Skill": skill,
-
-            "Additional Jobs Unlocked": count
-
-        })
-
-
-    result.sort(
-        key=lambda x:
-        x["Additional Jobs Unlocked"],
-        reverse=True
-    )
-
-
-    return result
+    return results
