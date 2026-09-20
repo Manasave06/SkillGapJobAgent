@@ -1,1147 +1,994 @@
-import os
-
 import streamlit as st
 import pandas as pd
 
-from utils.pdf_reader import (
-    extract_text_from_pdf
-)
-
-from agents.profile_agent import (
-    extract_profile
-)
-
-from agents.matching_agent import (
-    match_jobs
-)
-
-from agents.gap_agent import (
-    explain_gap
-)
-
-from agents.training_agent import (
-    recommend_courses,
-    calculate_time_and_cost
-)
-
-from utils.scoring import (
-    opportunity_unlock
-)
+from utils.pdf_reader import extract_text_from_pdf
+from agents.profile_agent import extract_profile
+from agents.matching_agent import match_jobs
+from agents.gap_agent import explain_gap
+from agents.training_agent import recommend_courses, calculate_time_and_cost
+from utils.scoring import opportunity_unlock
 
 
-# =========================================================
-# PAGE
-# =========================================================
+# ---------------------------------------------------------
+# PAGE CONFIGURATION
+# ---------------------------------------------------------
 
 st.set_page_config(
     page_title="SkillGap AI",
-    page_icon="🎯",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_icon=None,
+    layout="wide"
 )
 
 
-# =========================================================
-# CSS
-# =========================================================
-
-st.markdown(
-    """
-    <style>
-
-    .stApp {
-        background: #f7f8fc;
-    }
-
-    .hero {
-        background: white;
-        padding: 35px;
-        border-radius: 20px;
-        text-align: center;
-        margin-bottom: 30px;
-        border: 1px solid #e5e7eb;
-    }
-
-    .hero-title {
-        font-size: 48px;
-        font-weight: 800;
-        margin-bottom: 10px;
-    }
-
-    .hero-text {
-        color: #667085;
-        font-size: 18px;
-    }
-
-    .card {
-        background: white;
-        padding: 22px;
-        border-radius: 16px;
-        border: 1px solid #e5e7eb;
-        margin-bottom: 15px;
-    }
-
-    .small-text {
-        color: #667085;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# =========================================================
+# ---------------------------------------------------------
 # SESSION STATE
-# =========================================================
+# ---------------------------------------------------------
 
 if "candidates" not in st.session_state:
-
     st.session_state.candidates = []
 
-
-if "results" not in st.session_state:
-
-    st.session_state.results = {}
+if "analysis_done" not in st.session_state:
+    st.session_state.analysis_done = False
 
 
-# =========================================================
-# HERO
-# =========================================================
+# ---------------------------------------------------------
+# TITLE
+# ---------------------------------------------------------
 
-st.markdown(
-    """
-    <div class="hero">
-
-        <div class="hero-title">
-            🎯 SkillGap AI
-        </div>
-
-        <div class="hero-text">
-            Transform resumes into actionable career intelligence.
-            Discover skills, identify job gaps and build a
-            personalized path to job readiness.
-        </div>
-
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-
-# =========================================================
-# FEATURES
-# =========================================================
-
-st.subheader(
-    "✨ What SkillGap AI does"
-)
+st.title("SkillGap AI")
 
 st.write(
-    "One intelligent workflow from resume understanding "
-    "to personalized career planning."
+    "Analyze candidate skills, identify job gaps, "
+    "and create personalized learning paths."
 )
 
-f1, f2, f3, f4 = st.columns(4)
 
-with f1:
+# ---------------------------------------------------------
+# SIDEBAR
+# ---------------------------------------------------------
 
-    st.markdown("### 📄 Resume Intelligence")
+st.sidebar.header("SkillGap AI")
 
-    st.write(
-        "Extract education, skills, projects, "
-        "certifications and experience."
-    )
-
-
-with f2:
-
-    st.markdown("### 🎯 Job Matching")
-
-    st.write(
-        "Compare candidate skills with job "
-        "requirements."
-    )
-
-
-with f3:
-
-    st.markdown("### 🔍 Skill Gap Analysis")
-
-    st.write(
-        "Identify exactly which skills are "
-        "missing for a job."
-    )
-
-
-with f4:
-
-    st.markdown("### 🚀 Career Roadmap")
-
-    st.write(
-        "Get training, time, cost and a "
-        "learning roadmap."
-    )
-
-
-st.divider()
-
-
-# =========================================================
-# UPLOAD
-# =========================================================
-
-st.subheader(
-    "📄 Analyze Candidate Resumes"
+st.sidebar.write(
+    "Upload resumes to analyze candidate skills "
+    "and match them with available jobs."
 )
 
-st.write(
-    "Upload multiple PDF resumes. "
-    "All candidates will be analyzed."
+free_only = st.sidebar.checkbox(
+    "Show only free courses",
+    value=False
 )
+
+
+# ---------------------------------------------------------
+# RESUME UPLOAD
+# ---------------------------------------------------------
+
+st.header("Upload Candidate Resumes")
 
 uploaded_files = st.file_uploader(
-    "Choose PDF resumes",
+    "Upload one or more resume PDF files",
     type=["pdf"],
     accept_multiple_files=True
 )
 
 
-# =========================================================
-# MANUAL PROFILE
-# =========================================================
+# ---------------------------------------------------------
+# ANALYZE BUTTON
+# ---------------------------------------------------------
 
-with st.expander(
-    "✍️ Add a candidate manually"
-):
+if uploaded_files:
 
-    manual_name = st.text_input(
-        "Candidate Name"
+    st.write(
+        "Selected resumes:",
+        len(uploaded_files)
     )
 
-    manual_skills = st.text_input(
-        "Skills",
-        placeholder="Python, SQL, HTML, CSS"
-    )
+    for file in uploaded_files:
+        st.write(file.name)
 
-    manual_location = st.text_input(
-        "Location",
-        placeholder="Bengaluru"
-    )
+    if st.button("Analyze All Candidates"):
 
-    manual_education = st.text_input(
-        "Education"
-    )
+        candidates = []
 
+        progress = st.progress(0)
 
-# =========================================================
-# ANALYZE ALL
-# =========================================================
+        total_files = len(uploaded_files)
 
-if st.button(
-    "🚀 Analyze ALL Candidates",
-    type="primary",
-    use_container_width=True
-):
-
-    candidates = []
-
-    results = {}
-
-    # -----------------------------------------------------
-    # PDF FILES
-    # -----------------------------------------------------
-
-    if uploaded_files:
-
-        progress = st.progress(
-            0,
-            text="Starting analysis..."
-        )
-
-        total = len(
-            uploaded_files
-        )
-
-        for number, file in enumerate(
-            uploaded_files,
-            start=1
-        ):
+        for index, uploaded_file in enumerate(uploaded_files):
 
             try:
 
-                progress.progress(
-                    (number - 1) / total,
-                    text=(
-                        f"Reading {file.name}..."
-                    )
-                )
-
-                resume_text = (
-                    extract_text_from_pdf(
-                        file
-                    )
+                resume_text = extract_text_from_pdf(
+                    uploaded_file
                 )
 
                 if not resume_text.strip():
-
                     st.warning(
-                        f"{file.name} has no readable text."
+                        f"No readable text found in {uploaded_file.name}"
                     )
-
                     continue
-
-                progress.progress(
-                    (number - 0.5) / total,
-                    text=(
-                        f"Understanding "
-                        f"{file.name}..."
-                    )
-                )
 
                 profile = extract_profile(
                     resume_text
                 )
 
-                candidate_name = (
-                    profile.get(
-                        "name"
-                    )
-                    or file.name
+                location = profile.get(
+                    "location",
+                    ""
+                )
+
+                skills = profile.get(
+                    "skills",
+                    []
+                )
+
+                jobs = match_jobs(
+                    skills,
+                    location
                 )
 
                 candidate = {
-
-                    "name":
-                        candidate_name,
-
-                    "location":
-                        profile.get(
-                            "location",
-                            ""
-                        ),
-
-                    "education":
-                        profile.get(
-                            "education",
-                            []
-                        ),
-
-                    "skills":
-                        profile.get(
-                            "skills",
-                            []
-                        ),
-
-                    "projects":
-                        profile.get(
-                            "projects",
-                            []
-                        ),
-
-                    "certifications":
-                        profile.get(
-                            "certifications",
-                            []
-                        ),
-
-                    "interests":
-                        profile.get(
-                            "interests",
-                            []
-                        ),
-
-                    "experience":
-                        profile.get(
-                            "experience",
-                            []
-                        ),
-
-                    "source":
-                        file.name
+                    "filename": uploaded_file.name,
+                    "resume_text": resume_text,
+                    "profile": profile,
+                    "skills": skills,
+                    "jobs": jobs
                 }
 
-                candidates.append(
-                    candidate
-                )
-
-                progress.progress(
-                    number / total,
-                    text=(
-                        f"Matching "
-                        f"{candidate_name} "
-                        f"with jobs..."
-                    )
-                )
-
-                job_results = match_jobs(
-                    candidate["skills"],
-                    candidate["location"]
-                )
-
-                results[
-                    candidate_name
-                ] = job_results
+                candidates.append(candidate)
 
             except Exception as error:
 
                 st.error(
-                    f"Error processing {file.name}"
+                    f"Error processing {uploaded_file.name}: {error}"
                 )
 
-                st.exception(
-                    error
-                )
+            progress.progress(
+                (index + 1) / total_files
+            )
 
-        progress.empty()
-
-
-    # -----------------------------------------------------
-    # MANUAL PROFILE
-    # -----------------------------------------------------
-
-    if (
-        manual_name
-        and manual_skills
-    ):
-
-        skills = [
-            skill.strip()
-            for skill in
-            manual_skills.split(",")
-            if skill.strip()
-        ]
-
-        candidate = {
-
-            "name":
-                manual_name,
-
-            "location":
-                manual_location,
-
-            "education":
-                [manual_education]
-                if manual_education
-                else [],
-
-            "skills":
-                skills,
-
-            "projects": [],
-
-            "certifications": [],
-
-            "interests": [],
-
-            "experience": [],
-
-            "source":
-                "Manual Profile"
-        }
-
-        candidates.append(
-            candidate
-        )
-
-        results[
-            manual_name
-        ] = match_jobs(
-            skills,
-            manual_location
-        )
-
-
-    # -----------------------------------------------------
-    # SAVE
-    # -----------------------------------------------------
-
-    st.session_state.candidates = (
-        candidates
-    )
-
-    st.session_state.results = (
-        results
-    )
-
-    if candidates:
+        st.session_state.candidates = candidates
+        st.session_state.analysis_done = True
 
         st.success(
-            f"✅ {len(candidates)} candidate(s) "
-            "analyzed successfully."
-        )
-
-    else:
-
-        st.warning(
-            "No candidates were analyzed."
+            f"Analysis completed for {len(candidates)} candidates."
         )
 
 
-# =========================================================
-# DASHBOARD
-# =========================================================
+# ---------------------------------------------------------
+# STOP IF NO ANALYSIS
+# ---------------------------------------------------------
 
-st.divider()
-
-st.subheader(
-    "📊 Career Intelligence Dashboard"
-)
-
-candidate_count = len(
-    st.session_state.candidates
-)
-
-skill_count = len(
-    set(
-        skill
-        for candidate
-        in st.session_state.candidates
-        for skill
-        in candidate.get(
-            "skills",
-            []
-        )
-    )
-)
-
-
-try:
-
-    jobs_count = len(
-        pd.read_csv(
-            "data/jobs.csv"
-        )
-    )
-
-except Exception:
-
-    jobs_count = 0
-
-
-try:
-
-    courses_count = len(
-        pd.read_csv(
-            "data/courses.csv"
-        )
-    )
-
-except Exception:
-
-    courses_count = 0
-
-
-m1, m2, m3, m4 = st.columns(4)
-
-with m1:
-
-    st.metric(
-        "Candidates Analyzed",
-        candidate_count
-    )
-
-with m2:
-
-    st.metric(
-        "Unique Skills Detected",
-        skill_count
-    )
-
-with m3:
-
-    st.metric(
-        "Job Opportunities",
-        jobs_count
-    )
-
-with m4:
-
-    st.metric(
-        "Learning Resources",
-        courses_count
-    )
-
-
-# =========================================================
-# NO RESULTS
-# =========================================================
-
-if not st.session_state.candidates:
+if not st.session_state.analysis_done:
 
     st.info(
-        "Upload multiple PDF resumes above "
-        "and click Analyze ALL Candidates."
+        "Upload resumes and click Analyze All Candidates."
     )
 
     st.stop()
 
 
-# =========================================================
-# ALL CANDIDATES
-# =========================================================
+if not st.session_state.candidates:
 
-st.divider()
+    st.warning(
+        "No candidates were successfully analyzed."
+    )
 
-st.subheader(
-    "👥 All Analyzed Candidates"
+    st.stop()
+
+
+# ---------------------------------------------------------
+# DASHBOARD
+# ---------------------------------------------------------
+
+st.header("Dashboard")
+
+candidate_count = len(
+    st.session_state.candidates
 )
 
-st.write(
-    "Every uploaded resume is shown below."
+all_skills = []
+
+all_jobs = []
+
+for candidate in st.session_state.candidates:
+
+    all_skills.extend(
+        candidate["skills"]
+    )
+
+    all_jobs.extend(
+        candidate["jobs"]
+    )
+
+
+unique_skills = set(
+    skill.lower().strip()
+    for skill in all_skills
 )
 
 
-candidate_tabs = st.tabs(
-    [
-        candidate["name"]
-        for candidate
-        in st.session_state.candidates
-    ]
-)
+total_jobs = 0
+
+for candidate in st.session_state.candidates:
+    total_jobs += len(
+        candidate["jobs"]
+    )
 
 
-# =========================================================
-# EACH CANDIDATE
-# =========================================================
+col1, col2, col3, col4 = st.columns(4)
 
-for tab, candidate in zip(
-    candidate_tabs,
+with col1:
+    st.metric(
+        "Candidates",
+        candidate_count
+    )
+
+with col2:
+    st.metric(
+        "Unique Skills",
+        len(unique_skills)
+    )
+
+with col3:
+    st.metric(
+        "Jobs Analyzed",
+        total_jobs
+    )
+
+with col4:
+    st.metric(
+        "Learning Resources",
+        len(pd.read_csv("data/courses.csv"))
+    )
+
+
+# ---------------------------------------------------------
+# CANDIDATE TABS
+# ---------------------------------------------------------
+
+st.header("Candidate Analysis")
+
+candidate_names = []
+
+for index, candidate in enumerate(
     st.session_state.candidates
 ):
 
+    profile = candidate["profile"]
+
+    name = profile.get(
+        "name",
+        ""
+    )
+
+    if not name:
+        name = f"Candidate {index + 1}"
+
+    candidate_names.append(
+        name
+    )
+
+
+tabs = st.tabs(
+    candidate_names
+)
+
+
+for index, tab in enumerate(tabs):
+
+    candidate = st.session_state.candidates[index]
+
+    profile = candidate["profile"]
+
+    skills = candidate["skills"]
+
+    jobs = candidate["jobs"]
+
     with tab:
 
-        candidate_name = (
-            candidate["name"]
-        )
+        # -------------------------------------------------
+        # BASIC PROFILE
+        # -------------------------------------------------
 
-        jobs = (
-            st.session_state.results.get(
-                candidate_name,
+        st.subheader("Candidate Profile")
+
+        profile_col1, profile_col2 = st.columns(2)
+
+        with profile_col1:
+
+            name = profile.get(
+                "name",
+                ""
+            )
+
+            location = profile.get(
+                "location",
+                ""
+            )
+
+            st.write(
+                f"Name: {name}"
+            )
+
+            st.write(
+                f"Location: {location}"
+            )
+
+            st.write(
+                f"Resume: {candidate['filename']}"
+            )
+
+        with profile_col2:
+
+            education = profile.get(
+                "education",
                 []
             )
-        )
 
-        # -------------------------------------------------
-        # PROFILE
-        # -------------------------------------------------
+            experience = profile.get(
+                "experience",
+                []
+            )
 
-        st.markdown(
-            "## 👤 Candidate Profile"
-        )
+            certifications = profile.get(
+                "certifications",
+                []
+            )
 
-        c1, c2 = st.columns(2)
-
-        with c1:
-
-            st.write(
-                "**Name:**",
-                candidate["name"]
+            interests = profile.get(
+                "interests",
+                []
             )
 
             st.write(
-                "**Location:**",
-                candidate["location"]
-                or
-                "Not specified"
+                "Education:"
             )
 
-            st.write(
-                "**Education:**"
-            )
-
-            for education in candidate[
-                "education"
-            ]:
-
-                st.write(
-                    f"• {education}"
-                )
-
-        with c2:
-
-            st.write(
-                "**Skills:**"
-            )
-
-            if candidate["skills"]:
-
-                st.write(
-                    ", ".join(
-                        candidate["skills"]
+            if education:
+                for item in education:
+                    st.write(
+                        f"- {item}"
                     )
-                )
-
             else:
-
-                st.warning(
-                    "No skills detected."
+                st.write(
+                    "No education information found."
                 )
 
+            st.write(
+                "Experience:"
+            )
+
+            if experience:
+                for item in experience:
+                    st.write(
+                        f"- {item}"
+                    )
+            else:
+                st.write(
+                    "No experience information found."
+                )
+
+
         # -------------------------------------------------
-        # PROJECTS
+        # SKILLS
         # -------------------------------------------------
 
-        if candidate["projects"]:
+        st.subheader("Current Skills")
 
-            with st.expander(
-                "📁 Projects"
-            ):
+        if skills:
 
-                for project in candidate[
-                    "projects"
-                ]:
+            skills_text = ", ".join(
+                skills
+            )
 
-                    if isinstance(
-                        project,
-                        dict
-                    ):
+            st.write(
+                skills_text
+            )
 
-                        title = project.get(
-                            "title",
-                            "Project"
-                        )
+        else:
 
-                        description = (
-                            project.get(
-                                "description",
-                                ""
-                            )
-                        )
+            st.write(
+                "No technical skills detected."
+            )
 
-                        st.markdown(
-                            f"**{title}**"
-                        )
-
-                        if description:
-
-                            st.write(
-                                description
-                            )
-
-                    else:
-
-                        st.write(
-                            f"• {project}"
-                        )
 
         # -------------------------------------------------
         # CERTIFICATIONS
         # -------------------------------------------------
 
-        if candidate[
-            "certifications"
-        ]:
+        if certifications:
 
-            with st.expander(
-                "🏆 Certifications"
-            ):
+            st.subheader("Certifications")
 
-                for certification in (
-                    candidate[
-                        "certifications"
-                    ]
-                ):
+            for certificate in certifications:
 
-                    st.write(
-                        f"• {certification}"
-                    )
+                st.write(
+                    f"- {certificate}"
+                )
+
+
+        # -------------------------------------------------
+        # INTERESTS
+        # -------------------------------------------------
+
+        if interests:
+
+            st.subheader("Interests")
+
+            for interest in interests:
+
+                st.write(
+                    f"- {interest}"
+                )
+
 
         # -------------------------------------------------
         # JOB MATCHING
         # -------------------------------------------------
 
-        st.markdown(
-            "## 🎯 Job Matching"
-        )
+        st.subheader("Job Matching")
 
         if not jobs:
 
             st.warning(
-                "No jobs found."
+                "No jobs were found."
             )
 
-            continue
+        else:
 
-        st.write(
-            f"{len(jobs)} job opportunities "
-            "were evaluated."
-        )
+            job_rows = []
 
-        # -------------------------------------------------
-        # JOB TABLE
-        # -------------------------------------------------
+            for job in jobs:
 
-        table_data = []
-
-        for job in jobs:
-
-            table_data.append(
-                {
-                    "Job":
-                        job["title"],
-
-                    "Company":
-                        job["company"],
-
-                    "Location":
-                        job["location"],
-
-                    "Match %":
-                        f'{job["match_score"]:.1f}%',
-
-                    "Skills Matched":
-                        f'{len(job["matched_skills"])} / '
-                        f'{len(job["required_skills"])}',
-
-                    "Missing":
-                        len(
-                            job[
-                                "missing_skills"
-                            ]
-                        )
-                }
-            )
-
-        job_table = pd.DataFrame(
-            table_data
-        )
-
-        st.dataframe(
-            job_table,
-            use_container_width=True,
-            hide_index=True
-        )
-
-        # -------------------------------------------------
-        # TOP MATCHES
-        # -------------------------------------------------
-
-        st.markdown(
-            "### 🎯 Job Match Details"
-        )
-
-        for position, job in enumerate(
-            jobs[:5],
-            start=1
-        ):
-
-            with st.container(
-                border=True
-            ):
-
-                st.markdown(
-                    f"### {position}. "
-                    f"{job['title']}"
-                )
-
-                st.write(
-                    f"🏢 {job['company']}  "
-                    f"• 📍 {job['location']}"
-                )
-
-                st.progress(
-                    int(
-                        min(
-                            job[
-                                "match_score"
-                            ],
-                            100
-                        )
-                    )
-                )
-
-                st.metric(
-                    "Job Match",
-                    f'{job["match_score"]:.1f}%'
-                )
-
-                d1, d2 = st.columns(2)
-
-                with d1:
-
-                    st.write(
-                        "### ✅ Matched Skills"
-                    )
-
-                    if job[
-                        "matched_skills"
-                    ]:
-
-                        for skill in job[
-                            "matched_skills"
-                        ]:
-
-                            st.write(
-                                f"✓ {skill}"
-                            )
-
-                    else:
-
-                        st.write(
-                            "No required skills matched."
-                        )
-
-                with d2:
-
-                    st.write(
-                        "### ❌ Missing Skills"
-                    )
-
-                    if job[
-                        "missing_skills"
-                    ]:
-
-                        for skill in job[
-                            "missing_skills"
-                        ]:
-
-                            st.write(
-                                f"• {skill}"
-                            )
-
-                    else:
-
-                        st.success(
-                            "No major skill gaps."
-                        )
-
-
-        # -------------------------------------------------
-        # TARGET JOB
-        # -------------------------------------------------
-
-        st.divider()
-
-        st.markdown(
-            "## 🔍 Detailed Skill Gap Analysis"
-        )
-
-        job_options = [
-            job["title"]
-            for job in jobs
-        ]
-
-        selected_title = st.selectbox(
-            "Choose a target job",
-            job_options,
-            key=f"job_{candidate_name}"
-        )
-
-        selected_job = next(
-            job
-            for job in jobs
-            if job["title"]
-            == selected_title
-        )
-
-        st.metric(
-            "Current Job Match",
-            f'{selected_job["match_score"]:.1f}%'
-        )
-
-        # -------------------------------------------------
-        # BREAKDOWN
-        # -------------------------------------------------
-
-        b1, b2, b3 = st.columns(3)
-
-        with b1:
-
-            st.metric(
-                "Skill Coverage",
-                f'{selected_job["skill_coverage"]:.1f}%'
-            )
-
-        with b2:
-
-            st.metric(
-                "Skills Matched",
-                f'{len(selected_job["matched_skills"])} / '
-                f'{len(selected_job["required_skills"])}'
-            )
-
-        with b3:
-
-            st.metric(
-                "Location Fit",
-                f'{selected_job["location_fit"]:.0f}%'
-            )
-
-        # -------------------------------------------------
-        # AI GAP ONLY WHEN REQUESTED
-        # -------------------------------------------------
-
-        if st.button(
-            "🤖 Generate AI Gap Explanation",
-            key=f"gap_{candidate_name}"
-        ):
-
-            with st.spinner(
-                "Generating explanation..."
-            ):
-
-                explanation = explain_gap(
-                    selected_job[
-                        "title"
-                    ],
-                    selected_job[
-                        "matched_skills"
-                    ],
-                    selected_job[
-                        "missing_skills"
-                    ]
-                )
-
-            st.markdown(
-                explanation
-            )
-
-        # -------------------------------------------------
-        # TRAINING
-        # -------------------------------------------------
-
-        st.markdown(
-            "## 🎓 Training Path"
-        )
-
-        free_only = st.checkbox(
-            "Only show free courses",
-            key=f"free_{candidate_name}"
-        )
-
-        courses = recommend_courses(
-            selected_job[
-                "missing_skills"
-            ],
-            free_only
-        )
-
-        if courses:
-
-            total_weeks, total_cost = (
-                calculate_time_and_cost(
-                    courses
-                )
-            )
-
-            course_table = []
-
-            for course in courses:
-
-                course_table.append(
+                job_rows.append(
                     {
-                        "Missing Skill":
-                            course["skill"],
-
-                        "Course":
-                            course["course"],
-
-                        "Provider":
-                            course["provider"],
-
-                        "Duration":
-                            f'{course["duration_weeks"]} weeks',
-
-                        "Cost":
-                            f'₹{course["cost"]:,.0f}',
-
-                        "Level":
-                            course["level"]
+                        "Job": job["title"],
+                        "Company": job["company"],
+                        "Location": job["location"],
+                        "Match Score": job["match_score"],
+                        "Skill Coverage": job["skill_coverage"],
+                        "Location Fit": job["location_fit"]
                     }
                 )
 
+            job_dataframe = pd.DataFrame(
+                job_rows
+            )
+
             st.dataframe(
-                pd.DataFrame(
-                    course_table
-                ),
+                job_dataframe,
                 use_container_width=True,
                 hide_index=True
             )
 
-            tc1, tc2 = st.columns(2)
 
-            with tc1:
+        # -------------------------------------------------
+        # TOP JOB MATCHES
+        # -------------------------------------------------
 
-                st.metric(
-                    "Time to Ready",
-                    f"{total_weeks} weeks"
+        st.subheader("Top Job Matches")
+
+        top_jobs = jobs[:5]
+
+        if top_jobs:
+
+            for job_index, job in enumerate(top_jobs):
+
+                st.write(
+                    f"{job_index + 1}. {job['title']}"
                 )
 
-            with tc2:
-
-                st.metric(
-                    "Estimated Cost",
-                    f"₹{total_cost:,.0f}"
+                st.write(
+                    f"Company: {job['company']}"
                 )
+
+                st.write(
+                    f"Location: {job['location']}"
+                )
+
+                st.write(
+                    f"Match Score: {job['match_score']} percent"
+                )
+
+                st.write(
+                    f"Skill Coverage: {job['skill_coverage']} percent"
+                )
+
+                matched = job.get(
+                    "matched_skills",
+                    []
+                )
+
+                missing = job.get(
+                    "missing_skills",
+                    []
+                )
+
+                st.write(
+                    "Matched Skills:"
+                )
+
+                if matched:
+
+                    st.write(
+                        ", ".join(matched)
+                    )
+
+                else:
+
+                    st.write(
+                        "None"
+                    )
+
+                st.write(
+                    "Missing Skills:"
+                )
+
+                if missing:
+
+                    st.write(
+                        ", ".join(missing)
+                    )
+
+                else:
+
+                    st.write(
+                        "None"
+                    )
+
+                if job.get("url"):
+
+                    st.write(
+                        f"Job Link: {job['url']}"
+                    )
+
+                st.divider()
+
+
+        # -------------------------------------------------
+        # SELECT JOB
+        # -------------------------------------------------
+
+        if jobs:
+
+            st.subheader(
+                "Detailed Skill Gap Analysis"
+            )
+
+            job_options = []
+
+            for job in jobs:
+
+                label = (
+                    f"{job['title']} - "
+                    f"{job['company']} - "
+                    f"{job['match_score']} percent"
+                )
+
+                job_options.append(
+                    label
+                )
+
+            selected_index = st.selectbox(
+                "Select a job",
+                range(len(job_options)),
+                format_func=lambda x: job_options[x],
+                key=f"job_select_{index}"
+            )
+
+            selected_job = jobs[selected_index]
+
+            st.write(
+                f"Job Title: {selected_job['title']}"
+            )
+
+            st.write(
+                f"Company: {selected_job['company']}"
+            )
+
+            st.write(
+                f"Location: {selected_job['location']}"
+            )
+
+            st.write(
+                f"Match Score: {selected_job['match_score']} percent"
+            )
+
+            st.write(
+                f"Skill Coverage: {selected_job['skill_coverage']} percent"
+            )
+
+            st.write(
+                f"Location Fit: {selected_job['location_fit']} percent"
+            )
+
+            st.write(
+                "Required Skills:"
+            )
+
+            st.write(
+                ", ".join(
+                    selected_job["required_skills"]
+                )
+            )
+
+            st.write(
+                "Matched Skills:"
+            )
+
+            if selected_job["matched_skills"]:
+
+                st.write(
+                    ", ".join(
+                        selected_job["matched_skills"]
+                    )
+                )
+
+            else:
+
+                st.write(
+                    "None"
+                )
+
+            st.write(
+                "Missing Skills:"
+            )
+
+            if selected_job["missing_skills"]:
+
+                st.write(
+                    ", ".join(
+                        selected_job["missing_skills"]
+                    )
+                )
+
+            else:
+
+                st.write(
+                    "None"
+                )
+
+
+            # ---------------------------------------------
+            # AI GAP EXPLANATION
+            # ---------------------------------------------
+
+            explain_key = (
+                f"explain_{index}_{selected_index}"
+            )
+
+            if st.button(
+                "Generate AI Skill Gap Explanation",
+                key=explain_key
+            ):
+
+                with st.spinner(
+                    "Generating explanation..."
+                ):
+
+                    try:
+
+                        explanation = explain_gap(
+                            selected_job["title"],
+                            selected_job["matched_skills"],
+                            selected_job["missing_skills"]
+                        )
+
+                        st.write(
+                            explanation
+                        )
+
+                    except Exception as error:
+
+                        st.error(
+                            f"Could not generate explanation: {error}"
+                        )
+
+
+            # ---------------------------------------------
+            # TRAINING PATH
+            # ---------------------------------------------
+
+            st.subheader(
+                "Training Path"
+            )
+
+            missing_skills = selected_job.get(
+                "missing_skills",
+                []
+            )
+
+            if missing_skills:
+
+                courses = recommend_courses(
+                    missing_skills,
+                    free_only=free_only
+                )
+
+                if courses:
+
+                    course_rows = []
+
+                    for course in courses:
+
+                        course_rows.append(
+                            {
+                                "Missing Skill": course["skill"],
+                                "Course": course["course"],
+                                "Provider": course["provider"],
+                                "Duration": (
+                                    f"{course['duration_weeks']} weeks"
+                                ),
+                                "Cost": course["cost"],
+                                "Level": course["level"]
+                            }
+                        )
+
+                    course_dataframe = pd.DataFrame(
+                        course_rows
+                    )
+
+                    st.dataframe(
+                        course_dataframe,
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    total_weeks, total_cost = (
+                        calculate_time_and_cost(
+                            courses
+                        )
+                    )
+
+                    time_col1, time_col2 = st.columns(2)
+
+                    with time_col1:
+
+                        st.metric(
+                            "Time to Ready",
+                            f"{total_weeks} weeks"
+                        )
+
+                    with time_col2:
+
+                        st.metric(
+                            "Total Training Cost",
+                            f"Rs {total_cost:.0f}"
+                        )
+
+
+                    st.write(
+                        "Courses required to close the identified skill gaps:"
+                    )
+
+                    for course in courses:
+
+                        st.write(
+                            f"{course['course']} "
+                            f"by {course['provider']}"
+                        )
+
+                        st.write(
+                            f"Skill: {course['skill']}"
+                        )
+
+                        st.write(
+                            f"Duration: "
+                            f"{course['duration_weeks']} weeks"
+                        )
+
+                        st.write(
+                            f"Cost: Rs {course['cost']}"
+                        )
+
+                        if course["url"]:
+
+                            st.write(
+                                f"Course Link: {course['url']}"
+                            )
+
+                        st.divider()
+
+                else:
+
+                    st.info(
+                        "No matching courses were found "
+                        "for the selected skill gaps."
+                    )
+
+            else:
+
+                st.success(
+                    "No missing skills were identified "
+                    "for this job."
+                )
+
+
+        # -------------------------------------------------
+        # OPPORTUNITY UNLOCK ENGINE
+        # -------------------------------------------------
+
+        st.subheader(
+            "Opportunity Unlock Analysis"
+        )
+
+        unlock_data = opportunity_unlock(
+            jobs,
+            skills
+        )
+
+        if unlock_data:
+
+            unlock_dataframe = pd.DataFrame(
+                unlock_data
+            )
+
+            skill_counts = (
+                unlock_dataframe
+                .groupby("Skill")
+                .size()
+                .reset_index(
+                    name="Additional Jobs"
+                )
+            )
+
+            skill_counts = skill_counts.sort_values(
+                "Additional Jobs",
+                ascending=False
+            )
+
+            st.write(
+                "Skills that appear as missing requirements "
+                "across the analyzed jobs:"
+            )
+
+            st.dataframe(
+                skill_counts,
+                use_container_width=True,
+                hide_index=True
+            )
 
         else:
 
             st.info(
-                "No course found for the identified skill gaps."
+                "No additional skill opportunities "
+                "were identified."
             )
+
 
         # -------------------------------------------------
         # ROADMAP
         # -------------------------------------------------
 
-        st.markdown(
-            "## 🗺️ 30 / 60 / 90 Day Roadmap"
+        st.subheader(
+            "Personalized Learning Roadmap"
         )
 
-        r1, r2, r3 = st.columns(3)
+        if jobs:
 
-        with r1:
+            best_job = jobs[0]
 
-            st.markdown(
-                "### 📅 0–30 Days"
+            roadmap_missing = best_job.get(
+                "missing_skills",
+                []
             )
 
-            st.write(
-                "Focus on the first priority "
-                "missing skill."
+            if roadmap_missing:
+
+                st.write(
+                    "Step 1: Learn the most important missing skills."
+                )
+
+                for skill_number, skill in enumerate(
+                    roadmap_missing[:3],
+                    start=1
+                ):
+
+                    st.write(
+                        f"{skill_number}. {skill}"
+                    )
+
+                st.write(
+                    "Step 2: Complete the recommended courses."
+                )
+
+                st.write(
+                    "Step 3: Build projects using the newly learned skills."
+                )
+
+                st.write(
+                    "Step 4: Update the resume with demonstrated skills."
+                )
+
+                st.write(
+                    "Step 5: Re-run SkillGap AI to measure the updated profile."
+                )
+
+            else:
+
+                st.write(
+                    "The candidate currently covers "
+                    "the identified requirements."
+                )
+
+
+# ---------------------------------------------------------
+# CANDIDATE COMPARISON
+# ---------------------------------------------------------
+
+st.header("Candidate Comparison")
+
+comparison_rows = []
+
+for candidate in st.session_state.candidates:
+
+    profile = candidate["profile"]
+
+    jobs = candidate["jobs"]
+
+    name = profile.get(
+        "name",
+        ""
+    )
+
+    if not name:
+
+        name = candidate["filename"]
+
+    if jobs:
+
+        average_score = sum(
+            job["match_score"]
+            for job in jobs
+        ) / len(jobs)
+
+        highest_score = jobs[0]["match_score"]
+
+    else:
+
+        average_score = 0
+        highest_score = 0
+
+    comparison_rows.append(
+        {
+            "Candidate": name,
+            "Skills": len(
+                candidate["skills"]
+            ),
+            "Jobs Analyzed": len(jobs),
+            "Highest Match": round(
+                highest_score,
+                1
+            ),
+            "Average Match": round(
+                average_score,
+                1
             )
-
-            st.write(
-                "Build one small practical project."
-            )
-
-        with r2:
-
-            st.markdown(
-                "### 📅 31–60 Days"
-            )
-
-            st.write(
-                "Learn the next required skill."
-            )
-
-            st.write(
-                "Improve the project and GitHub portfolio."
-            )
-
-        with r3:
-
-            st.markdown(
-                "### 📅 61–90 Days"
-            )
-
-            st.write(
-                "Close remaining skill gaps."
-            )
-
-            st.write(
-                "Prepare resume and interview projects."
-            )
+        }
+    )
 
 
-# =========================================================
+comparison_dataframe = pd.DataFrame(
+    comparison_rows
+)
+
+st.dataframe(
+    comparison_dataframe,
+    use_container_width=True,
+    hide_index=True
+)
+
+
+# ---------------------------------------------------------
 # FOOTER
-# =========================================================
+# ---------------------------------------------------------
 
 st.divider()
 
-st.caption(
-    "🎯 SkillGap AI • Agentic AI Career Intelligence"
+st.write(
+    "SkillGap AI converts resume information into "
+    "structured skills, job matches, skill gaps, "
+    "training paths, and time-to-ready estimates."
 )
