@@ -5,24 +5,370 @@ from utils.pdf_reader import extract_text_from_pdf
 from agents.profile_agent import extract_profile
 from agents.matching_agent import match_jobs
 from agents.gap_agent import explain_gap
-from agents.training_agent import recommend_courses, calculate_time_and_cost
+from agents.training_agent import (
+    recommend_courses,
+    calculate_time_and_cost
+)
 from utils.scoring import opportunity_unlock
 
 
-# ---------------------------------------------------------
+# =========================================================
 # PAGE CONFIGURATION
-# ---------------------------------------------------------
+# =========================================================
 
 st.set_page_config(
     page_title="SkillGap AI",
     page_icon=None,
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 
-# ---------------------------------------------------------
+# =========================================================
+# CUSTOM UI STYLE
+# =========================================================
+
+st.markdown(
+    """
+    <style>
+
+    /* Main application background */
+
+    .stApp {
+        background-color: #f5f7fb;
+    }
+
+
+    /* Main content width */
+
+    .block-container {
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+        max-width: 1400px;
+    }
+
+
+    /* Main title */
+
+    .main-title {
+        font-size: 38px;
+        font-weight: 800;
+        color: #172554;
+        margin-bottom: 4px;
+        letter-spacing: -1px;
+    }
+
+
+    .main-subtitle {
+        font-size: 16px;
+        color: #64748b;
+        margin-bottom: 25px;
+    }
+
+
+    /* Section headings */
+
+    .section-title {
+        font-size: 25px;
+        font-weight: 750;
+        color: #172554;
+        border-left: 5px solid #4f46e5;
+        padding-left: 12px;
+        margin-top: 28px;
+        margin-bottom: 18px;
+    }
+
+
+    .small-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-top: 15px;
+        margin-bottom: 10px;
+    }
+
+
+    /* Header card */
+
+    .header-card {
+        background: linear-gradient(
+            135deg,
+            #172554,
+            #3730a3
+        );
+        padding: 30px;
+        border-radius: 18px;
+        margin-bottom: 28px;
+        box-shadow: 0 8px 25px rgba(30, 41, 59, 0.12);
+    }
+
+
+    .header-card-title {
+        color: white;
+        font-size: 34px;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+
+
+    .header-card-text {
+        color: #dbeafe;
+        font-size: 16px;
+        line-height: 1.6;
+    }
+
+
+    /* Metric cards */
+
+    .metric-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 20px;
+        min-height: 125px;
+        box-shadow: 0 4px 15px rgba(15, 23, 42, 0.05);
+    }
+
+
+    .metric-label {
+        color: #64748b;
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+
+    .metric-value {
+        color: #172554;
+        font-size: 32px;
+        font-weight: 800;
+    }
+
+
+    /* Upload area */
+
+    .upload-card {
+        background: white;
+        border: 2px dashed #a5b4fc;
+        border-radius: 18px;
+        padding: 25px;
+        margin-top: 10px;
+        margin-bottom: 20px;
+    }
+
+
+    /* Information cards */
+
+    .info-card {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
+        padding: 20px;
+        margin-top: 12px;
+        margin-bottom: 12px;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+    }
+
+
+    .card-title {
+        color: #172554;
+        font-size: 19px;
+        font-weight: 750;
+        margin-bottom: 8px;
+    }
+
+
+    .card-text {
+        color: #475569;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+
+    /* Job cards */
+
+    .job-card {
+        background: white;
+        border: 1px solid #dbeafe;
+        border-radius: 16px;
+        padding: 22px;
+        margin: 12px 0;
+        box-shadow: 0 4px 15px rgba(30, 64, 175, 0.06);
+    }
+
+
+    .job-title {
+        color: #172554;
+        font-size: 20px;
+        font-weight: 800;
+    }
+
+
+    .job-company {
+        color: #64748b;
+        font-size: 14px;
+        margin-top: 4px;
+    }
+
+
+    /* Skill boxes */
+
+    .skill-box {
+        background: #eef2ff;
+        color: #3730a3;
+        border: 1px solid #c7d2fe;
+        border-radius: 9px;
+        padding: 7px 11px;
+        display: inline-block;
+        margin: 4px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+
+    .missing-box {
+        background: #fff7ed;
+        color: #c2410c;
+        border: 1px solid #fed7aa;
+        border-radius: 9px;
+        padding: 7px 11px;
+        display: inline-block;
+        margin: 4px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+
+    /* Score */
+
+    .score-box {
+        background: #eef2ff;
+        border-radius: 12px;
+        padding: 14px;
+        text-align: center;
+        margin-top: 12px;
+    }
+
+
+    .score-label {
+        color: #64748b;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+
+    .score-value {
+        color: #3730a3;
+        font-size: 27px;
+        font-weight: 800;
+    }
+
+
+    /* Training cards */
+
+    .training-card {
+        background: white;
+        border: 1px solid #dbeafe;
+        border-radius: 15px;
+        padding: 20px;
+        margin: 12px 0;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+    }
+
+
+    .training-title {
+        color: #172554;
+        font-size: 18px;
+        font-weight: 750;
+    }
+
+
+    .training-detail {
+        color: #64748b;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+
+
+    /* Status boxes */
+
+    .success-box {
+        background: #ecfdf5;
+        border: 1px solid #a7f3d0;
+        color: #065f46;
+        padding: 14px 16px;
+        border-radius: 12px;
+        margin: 10px 0;
+    }
+
+
+    .warning-box {
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        color: #92400e;
+        padding: 14px 16px;
+        border-radius: 12px;
+        margin: 10px 0;
+    }
+
+
+    /* Sidebar */
+
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
+    }
+
+
+    section[data-testid="stSidebar"] h1,
+    section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3 {
+        color: #172554;
+    }
+
+
+    /* Buttons */
+
+    .stButton > button {
+        border-radius: 10px;
+        font-weight: 650;
+        min-height: 44px;
+    }
+
+
+    /* Dataframes */
+
+    [data-testid="stDataFrame"] {
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+
+    /* Tabs */
+
+    button[data-baseweb="tab"] {
+        font-weight: 650;
+        color: #475569;
+    }
+
+
+    /* Divider */
+
+    hr {
+        border: none;
+        border-top: 1px solid #e2e8f0;
+        margin: 28px 0;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# =========================================================
 # SESSION STATE
-# ---------------------------------------------------------
+# =========================================================
 
 if "candidates" not in st.session_state:
     st.session_state.candidates = []
@@ -31,139 +377,276 @@ if "analysis_done" not in st.session_state:
     st.session_state.analysis_done = False
 
 
-# ---------------------------------------------------------
-# TITLE
-# ---------------------------------------------------------
+# =========================================================
+# APPLICATION HEADER
+# =========================================================
 
-st.title("SkillGap AI")
-
-st.write(
-    "Analyze candidate skills, identify job gaps, "
-    "and create personalized learning paths."
+st.markdown(
+    """
+    <div class="header-card">
+        <div class="header-card-title">
+            SkillGap AI
+        </div>
+        <div class="header-card-text">
+            Intelligent resume analysis, job matching,
+            skill-gap detection and personalized
+            learning recommendations.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # SIDEBAR
-# ---------------------------------------------------------
+# =========================================================
 
-st.sidebar.header("SkillGap AI")
+with st.sidebar:
 
-st.sidebar.write(
-    "Upload resumes to analyze candidate skills "
-    "and match them with available jobs."
+    st.header("Application Settings")
+
+    free_only = st.checkbox(
+        "Show only free courses",
+        value=False
+    )
+
+    st.divider()
+
+    st.subheader("Analysis Pipeline")
+
+    st.write(
+        "Resume"
+    )
+
+    st.write(
+        "Profile extraction"
+    )
+
+    st.write(
+        "Skill normalization"
+    )
+
+    st.write(
+        "Job matching"
+    )
+
+    st.write(
+        "Skill-gap analysis"
+    )
+
+    st.write(
+        "Training recommendation"
+    )
+
+    st.divider()
+
+    st.caption(
+        "Information that is unavailable in the "
+        "dataset is shown as Not available."
+    )
+
+
+# =========================================================
+# UPLOAD SECTION
+# =========================================================
+
+st.markdown(
+    '<div class="section-title">Resume Analysis</div>',
+    unsafe_allow_html=True
 )
 
-free_only = st.sidebar.checkbox(
-    "Show only free courses",
-    value=False
+st.markdown(
+    """
+    <div class="upload-card">
+        <div class="card-title">
+            Upload Candidate Resumes
+        </div>
+        <div class="card-text">
+            Upload one or more PDF resumes.
+            All candidates will be processed together.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
-
-# ---------------------------------------------------------
-# RESUME UPLOAD
-# ---------------------------------------------------------
-
-st.header("Upload Candidate Resumes")
 
 uploaded_files = st.file_uploader(
-    "Upload one or more resume PDF files",
+    "Select PDF resumes",
     type=["pdf"],
     accept_multiple_files=True
 )
 
 
-# ---------------------------------------------------------
-# ANALYZE BUTTON
-# ---------------------------------------------------------
+# =========================================================
+# SELECTED FILES
+# =========================================================
 
 if uploaded_files:
 
-    st.write(
-        "Selected resumes:",
-        len(uploaded_files)
+    st.markdown(
+        '<div class="small-title">Selected Resumes</div>',
+        unsafe_allow_html=True
     )
 
-    for file in uploaded_files:
-        st.write(file.name)
+    file_rows = []
 
-    if st.button("Analyze All Candidates"):
+    for file in uploaded_files:
+
+        file_rows.append(
+            {
+                "Resume": file.name,
+                "Size": f"{file.size / 1024:.1f} KB"
+            }
+        )
+
+    st.dataframe(
+        pd.DataFrame(file_rows),
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.write(
+        f"{len(uploaded_files)} resume(s) selected."
+    )
+
+
+# =========================================================
+# ANALYZE BUTTON
+# =========================================================
+
+if uploaded_files:
+
+    if st.button(
+        "Analyze All Candidates",
+        type="primary",
+        use_container_width=True
+    ):
 
         candidates = []
 
-        progress = st.progress(0)
+        progress_bar = st.progress(0)
 
-        total_files = len(uploaded_files)
+        status_text = st.empty()
 
-        for index, uploaded_file in enumerate(uploaded_files):
+        total_files = len(
+            uploaded_files
+        )
+
+        for index, uploaded_file in enumerate(
+            uploaded_files
+        ):
+
+            status_text.write(
+                f"Analyzing {uploaded_file.name}"
+            )
 
             try:
+
+                # -----------------------------------------
+                # READ PDF
+                # -----------------------------------------
 
                 resume_text = extract_text_from_pdf(
                     uploaded_file
                 )
 
                 if not resume_text.strip():
+
                     st.warning(
-                        f"No readable text found in {uploaded_file.name}"
+                        f"No readable text found in "
+                        f"{uploaded_file.name}."
                     )
+
                     continue
+
+
+                # -----------------------------------------
+                # PROFILE EXTRACTION
+                # -----------------------------------------
 
                 profile = extract_profile(
                     resume_text
                 )
 
-                location = profile.get(
-                    "location",
-                    ""
-                )
+
+                # -----------------------------------------
+                # SKILLS
+                # -----------------------------------------
 
                 skills = profile.get(
                     "skills",
                     []
                 )
 
+
+                location = profile.get(
+                    "location",
+                    ""
+                )
+
+
+                # -----------------------------------------
+                # JOB MATCHING
+                # -----------------------------------------
+
                 jobs = match_jobs(
                     skills,
                     location
                 )
 
-                candidate = {
-                    "filename": uploaded_file.name,
-                    "resume_text": resume_text,
-                    "profile": profile,
-                    "skills": skills,
-                    "jobs": jobs
-                }
 
-                candidates.append(candidate)
+                # -----------------------------------------
+                # SAVE CANDIDATE
+                # -----------------------------------------
+
+                candidates.append(
+                    {
+                        "filename": uploaded_file.name,
+                        "resume_text": resume_text,
+                        "profile": profile,
+                        "skills": skills,
+                        "jobs": jobs
+                    }
+                )
+
 
             except Exception as error:
 
                 st.error(
-                    f"Error processing {uploaded_file.name}: {error}"
+                    f"Could not analyze "
+                    f"{uploaded_file.name}: {error}"
                 )
 
-            progress.progress(
+
+            progress_bar.progress(
                 (index + 1) / total_files
             )
 
+
+        status_text.empty()
+
         st.session_state.candidates = candidates
+
         st.session_state.analysis_done = True
 
         st.success(
-            f"Analysis completed for {len(candidates)} candidates."
+            f"Analysis completed for "
+            f"{len(candidates)} candidate(s)."
         )
 
+        st.rerun()
 
-# ---------------------------------------------------------
-# STOP IF NO ANALYSIS
-# ---------------------------------------------------------
+
+# =========================================================
+# STOP IF NOTHING ANALYZED
+# =========================================================
 
 if not st.session_state.analysis_done:
 
     st.info(
-        "Upload resumes and click Analyze All Candidates."
+        "Upload resumes and select Analyze All Candidates."
     )
 
     st.stop()
@@ -171,26 +654,32 @@ if not st.session_state.analysis_done:
 
 if not st.session_state.candidates:
 
-    st.warning(
-        "No candidates were successfully analyzed."
+    st.error(
+        "No candidate information could be extracted."
     )
 
     st.stop()
 
 
-# ---------------------------------------------------------
+# =========================================================
 # DASHBOARD
-# ---------------------------------------------------------
+# =========================================================
 
-st.header("Dashboard")
+st.markdown(
+    '<div class="section-title">Dashboard</div>',
+    unsafe_allow_html=True
+)
+
 
 candidate_count = len(
     st.session_state.candidates
 )
 
+
 all_skills = []
 
-all_jobs = []
+total_jobs = 0
+
 
 for candidate in st.session_state.candidates:
 
@@ -198,87 +687,152 @@ for candidate in st.session_state.candidates:
         candidate["skills"]
     )
 
-    all_jobs.extend(
-        candidate["jobs"]
-    )
-
-
-unique_skills = set(
-    skill.lower().strip()
-    for skill in all_skills
-)
-
-
-total_jobs = 0
-
-for candidate in st.session_state.candidates:
     total_jobs += len(
         candidate["jobs"]
     )
 
 
-col1, col2, col3, col4 = st.columns(4)
+unique_skills = set(
+    str(skill).lower().strip()
+    for skill in all_skills
+)
 
-with col1:
-    st.metric(
-        "Candidates",
-        candidate_count
+
+try:
+
+    course_count = len(
+        pd.read_csv(
+            "data/courses.csv"
+        )
     )
 
-with col2:
-    st.metric(
-        "Unique Skills",
-        len(unique_skills)
+except Exception:
+
+    course_count = 0
+
+
+metric_col1, metric_col2, metric_col3, metric_col4 = (
+    st.columns(4)
+)
+
+
+with metric_col1:
+
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">
+                Candidates
+            </div>
+            <div class="metric-value">
+                {candidate_count}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-with col3:
-    st.metric(
-        "Jobs Analyzed",
-        total_jobs
+
+with metric_col2:
+
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">
+                Unique Skills
+            </div>
+            <div class="metric-value">
+                {len(unique_skills)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-with col4:
-    st.metric(
-        "Learning Resources",
-        len(pd.read_csv("data/courses.csv"))
+
+with metric_col3:
+
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">
+                Jobs Analyzed
+            </div>
+            <div class="metric-value">
+                {total_jobs}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
 
-# ---------------------------------------------------------
-# CANDIDATE TABS
-# ---------------------------------------------------------
+with metric_col4:
 
-st.header("Candidate Analysis")
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">
+                Learning Resources
+            </div>
+            <div class="metric-value">
+                {course_count}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+# =========================================================
+# CANDIDATE ANALYSIS
+# =========================================================
+
+st.markdown(
+    '<div class="section-title">Candidate Analysis</div>',
+    unsafe_allow_html=True
+)
+
 
 candidate_names = []
+
 
 for index, candidate in enumerate(
     st.session_state.candidates
 ):
 
-    profile = candidate["profile"]
-
-    name = profile.get(
+    name = candidate["profile"].get(
         "name",
         ""
     )
 
-    if not name:
+
+    if not name.strip():
+
         name = f"Candidate {index + 1}"
+
 
     candidate_names.append(
         name
     )
 
 
-tabs = st.tabs(
+candidate_tabs = st.tabs(
     candidate_names
 )
 
 
-for index, tab in enumerate(tabs):
+# =========================================================
+# EACH CANDIDATE
+# =========================================================
 
-    candidate = st.session_state.candidates[index]
+for candidate_index, tab in enumerate(
+    candidate_tabs
+):
+
+    candidate = st.session_state.candidates[
+        candidate_index
+    ]
 
     profile = candidate["profile"]
 
@@ -286,27 +840,57 @@ for index, tab in enumerate(tabs):
 
     jobs = candidate["jobs"]
 
+
     with tab:
 
-        # -------------------------------------------------
-        # BASIC PROFILE
-        # -------------------------------------------------
+        # =================================================
+        # PROFILE
+        # =================================================
 
-        st.subheader("Candidate Profile")
+        st.markdown(
+            '<div class="section-title">Candidate Profile</div>',
+            unsafe_allow_html=True
+        )
+
 
         profile_col1, profile_col2 = st.columns(2)
 
+
         with profile_col1:
+
+            st.markdown(
+                """
+                <div class="info-card">
+                    <div class="card-title">
+                        Basic Information
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
 
             name = profile.get(
                 "name",
                 ""
             )
 
+
+            if not name:
+
+                name = "Not available"
+
+
             location = profile.get(
                 "location",
                 ""
             )
+
+
+            if not location:
+
+                location = "Not available"
+
 
             st.write(
                 f"Name: {name}"
@@ -320,87 +904,131 @@ for index, tab in enumerate(tabs):
                 f"Resume: {candidate['filename']}"
             )
 
+
         with profile_col2:
+
+            st.markdown(
+                """
+                <div class="info-card">
+                    <div class="card-title">
+                        Education
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
 
             education = profile.get(
                 "education",
                 []
             )
 
-            experience = profile.get(
-                "experience",
-                []
-            )
-
-            certifications = profile.get(
-                "certifications",
-                []
-            )
-
-            interests = profile.get(
-                "interests",
-                []
-            )
-
-            st.write(
-                "Education:"
-            )
 
             if education:
+
                 for item in education:
+
                     st.write(
                         f"- {item}"
                     )
-            else:
-                st.write(
-                    "No education information found."
-                )
 
-            st.write(
-                "Experience:"
-            )
-
-            if experience:
-                for item in experience:
-                    st.write(
-                        f"- {item}"
-                    )
             else:
+
                 st.write(
-                    "No experience information found."
+                    "Not available"
                 )
 
 
-        # -------------------------------------------------
-        # SKILLS
-        # -------------------------------------------------
+        # =================================================
+        # EXPERIENCE
+        # =================================================
 
-        st.subheader("Current Skills")
+        st.markdown(
+            '<div class="small-title">Experience</div>',
+            unsafe_allow_html=True
+        )
 
-        if skills:
 
-            skills_text = ", ".join(
-                skills
-            )
+        experience = profile.get(
+            "experience",
+            []
+        )
 
-            st.write(
-                skills_text
-            )
+
+        if experience:
+
+            for item in experience:
+
+                st.write(
+                    f"- {item}"
+                )
 
         else:
 
             st.write(
-                "No technical skills detected."
+                "Not available"
             )
 
 
-        # -------------------------------------------------
+        # =================================================
+        # SKILLS
+        # =================================================
+
+        st.markdown(
+            '<div class="section-title">Current Skills</div>',
+            unsafe_allow_html=True
+        )
+
+
+        if skills:
+
+            skill_columns = st.columns(
+                min(4, len(skills))
+            )
+
+
+            for index, skill in enumerate(
+                skills
+            ):
+
+                with skill_columns[
+                    index % len(skill_columns)
+                ]:
+
+                    st.markdown(
+                        f"""
+                        <div class="skill-box">
+                            {skill}
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+        else:
+
+            st.warning(
+                "No technical skills were detected."
+            )
+
+
+        # =================================================
         # CERTIFICATIONS
-        # -------------------------------------------------
+        # =================================================
+
+        certifications = profile.get(
+            "certifications",
+            []
+        )
+
 
         if certifications:
 
-            st.subheader("Certifications")
+            st.markdown(
+                '<div class="small-title">Certifications</div>',
+                unsafe_allow_html=True
+            )
+
 
             for certificate in certifications:
 
@@ -409,13 +1037,23 @@ for index, tab in enumerate(tabs):
                 )
 
 
-        # -------------------------------------------------
+        # =================================================
         # INTERESTS
-        # -------------------------------------------------
+        # =================================================
+
+        interests = profile.get(
+            "interests",
+            []
+        )
+
 
         if interests:
 
-            st.subheader("Interests")
+            st.markdown(
+                '<div class="small-title">Interests</div>',
+                unsafe_allow_html=True
+            )
+
 
             for interest in interests:
 
@@ -424,113 +1062,192 @@ for index, tab in enumerate(tabs):
                 )
 
 
-        # -------------------------------------------------
+        # =================================================
         # JOB MATCHING
-        # -------------------------------------------------
+        # =================================================
 
-        st.subheader("Job Matching")
+        st.markdown(
+            '<div class="section-title">Job Matching</div>',
+            unsafe_allow_html=True
+        )
 
-        if not jobs:
 
-            st.warning(
-                "No jobs were found."
-            )
-
-        else:
+        if jobs:
 
             job_rows = []
+
 
             for job in jobs:
 
                 job_rows.append(
                     {
-                        "Job": job["title"],
-                        "Company": job["company"],
-                        "Location": job["location"],
-                        "Match Score": job["match_score"],
-                        "Skill Coverage": job["skill_coverage"],
-                        "Location Fit": job["location_fit"]
+                        "Job": job.get(
+                            "title",
+                            "Not available"
+                        ),
+                        "Company": job.get(
+                            "company",
+                            "Not available"
+                        ),
+                        "Location": job.get(
+                            "location",
+                            "Not available"
+                        ),
+                        "Match": (
+                            f"{job.get('match_score', 0)}%"
+                        ),
+                        "Skill Coverage": (
+                            f"{job.get('skill_coverage', 0)}%"
+                        ),
+                        "Location Fit": (
+                            f"{job.get('location_fit', 0)}%"
+                        )
                     }
                 )
 
-            job_dataframe = pd.DataFrame(
-                job_rows
-            )
 
             st.dataframe(
-                job_dataframe,
+                pd.DataFrame(job_rows),
                 use_container_width=True,
                 hide_index=True
             )
 
 
-        # -------------------------------------------------
+        else:
+
+            st.warning(
+                "No jobs are available for matching."
+            )
+
+
+        # =================================================
         # TOP JOB MATCHES
-        # -------------------------------------------------
+        # =================================================
 
-        st.subheader("Top Job Matches")
+        if jobs:
 
-        top_jobs = jobs[:5]
+            st.markdown(
+                '<div class="section-title">Top Job Opportunities</div>',
+                unsafe_allow_html=True
+            )
 
-        if top_jobs:
 
-            for job_index, job in enumerate(top_jobs):
+            for number, job in enumerate(
+                jobs[:5],
+                start=1
+            ):
 
-                st.write(
-                    f"{job_index + 1}. {job['title']}"
+                st.markdown(
+                    f"""
+                    <div class="job-card">
+                        <div class="job-title">
+                            {number}. {job['title']}
+                        </div>
+                        <div class="job-company">
+                            {job['company']} |
+                            {job['location']}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
                 )
 
-                st.write(
-                    f"Company: {job['company']}"
+
+                score_col1, score_col2 = (
+                    st.columns(2)
                 )
 
-                st.write(
-                    f"Location: {job['location']}"
+
+                with score_col1:
+
+                    st.markdown(
+                        f"""
+                        <div class="score-box">
+                            <div class="score-label">
+                                Match Score
+                            </div>
+                            <div class="score-value">
+                                {job['match_score']}%
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+
+                with score_col2:
+
+                    st.markdown(
+                        f"""
+                        <div class="score-box">
+                            <div class="score-label">
+                                Skill Coverage
+                            </div>
+                            <div class="score-value">
+                                {job['skill_coverage']}%
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+
+                st.markdown(
+                    '<div class="small-title">Matched Skills</div>',
+                    unsafe_allow_html=True
                 )
 
-                st.write(
-                    f"Match Score: {job['match_score']} percent"
-                )
-
-                st.write(
-                    f"Skill Coverage: {job['skill_coverage']} percent"
-                )
 
                 matched = job.get(
                     "matched_skills",
                     []
                 )
 
+
+                if matched:
+
+                    for skill in matched:
+
+                        st.markdown(
+                            f"""
+                            <span class="skill-box">
+                                {skill}
+                            </span>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                else:
+
+                    st.write(
+                        "None"
+                    )
+
+
+                st.markdown(
+                    '<div class="small-title">Missing Skills</div>',
+                    unsafe_allow_html=True
+                )
+
+
                 missing = job.get(
                     "missing_skills",
                     []
                 )
 
-                st.write(
-                    "Matched Skills:"
-                )
-
-                if matched:
-
-                    st.write(
-                        ", ".join(matched)
-                    )
-
-                else:
-
-                    st.write(
-                        "None"
-                    )
-
-                st.write(
-                    "Missing Skills:"
-                )
 
                 if missing:
 
-                    st.write(
-                        ", ".join(missing)
-                    )
+                    for skill in missing:
+
+                        st.markdown(
+                            f"""
+                            <span class="missing-box">
+                                {skill}
+                            </span>
+                            """,
+                            unsafe_allow_html=True
+                        )
 
                 else:
 
@@ -538,93 +1255,162 @@ for index, tab in enumerate(tabs):
                         "None"
                     )
 
-                if job.get("url"):
 
-                    st.write(
-                        f"Job Link: {job['url']}"
+                st.write("")
+
+
+                # -----------------------------------------
+                # SOURCE URL
+                # -----------------------------------------
+
+                job_url = str(
+                    job.get(
+                        "url",
+                        ""
+                    )
+                ).strip()
+
+
+                if (
+                    job_url
+                    and job_url.lower()
+                    not in [
+                        "nan",
+                        "none",
+                        "null",
+                        ""
+                    ]
+                    and "example.com"
+                    not in job_url.lower()
+                ):
+
+                    st.link_button(
+                        "Open Job Source",
+                        job_url
                     )
 
-                st.divider()
+                else:
+
+                    st.caption(
+                        "Job source: Not available"
+                    )
 
 
-        # -------------------------------------------------
-        # SELECT JOB
-        # -------------------------------------------------
+        # =================================================
+        # DETAILED SKILL GAP
+        # =================================================
 
         if jobs:
 
-            st.subheader(
-                "Detailed Skill Gap Analysis"
+            st.markdown(
+                '<div class="section-title">Detailed Skill Gap</div>',
+                unsafe_allow_html=True
             )
 
-            job_options = []
+
+            job_labels = []
+
 
             for job in jobs:
 
-                label = (
-                    f"{job['title']} - "
-                    f"{job['company']} - "
-                    f"{job['match_score']} percent"
+                job_labels.append(
+                    f"{job['title']} | "
+                    f"{job['company']} | "
+                    f"{job['match_score']}%"
                 )
 
-                job_options.append(
-                    label
+
+            selected_job_index = st.selectbox(
+                "Select a job for detailed analysis",
+                range(len(jobs)),
+                format_func=lambda x: job_labels[x],
+                key=f"job_select_{candidate_index}"
+            )
+
+
+            selected_job = jobs[
+                selected_job_index
+            ]
+
+
+            metric1, metric2, metric3 = (
+                st.columns(3)
+            )
+
+
+            with metric1:
+
+                st.metric(
+                    "Match Score",
+                    f"{selected_job['match_score']}%"
                 )
 
-            selected_index = st.selectbox(
-                "Select a job",
-                range(len(job_options)),
-                format_func=lambda x: job_options[x],
-                key=f"job_select_{index}"
-            )
 
-            selected_job = jobs[selected_index]
+            with metric2:
 
-            st.write(
-                f"Job Title: {selected_job['title']}"
-            )
-
-            st.write(
-                f"Company: {selected_job['company']}"
-            )
-
-            st.write(
-                f"Location: {selected_job['location']}"
-            )
-
-            st.write(
-                f"Match Score: {selected_job['match_score']} percent"
-            )
-
-            st.write(
-                f"Skill Coverage: {selected_job['skill_coverage']} percent"
-            )
-
-            st.write(
-                f"Location Fit: {selected_job['location_fit']} percent"
-            )
-
-            st.write(
-                "Required Skills:"
-            )
-
-            st.write(
-                ", ".join(
-                    selected_job["required_skills"]
+                st.metric(
+                    "Skill Coverage",
+                    f"{selected_job['skill_coverage']}%"
                 )
+
+
+            with metric3:
+
+                st.metric(
+                    "Location Fit",
+                    f"{selected_job['location_fit']}%"
+                )
+
+
+            st.markdown(
+                '<div class="small-title">Required Skills</div>',
+                unsafe_allow_html=True
             )
 
-            st.write(
-                "Matched Skills:"
+
+            required = selected_job.get(
+                "required_skills",
+                []
             )
 
-            if selected_job["matched_skills"]:
+
+            if required:
 
                 st.write(
-                    ", ".join(
-                        selected_job["matched_skills"]
-                    )
+                    ", ".join(required)
                 )
+
+            else:
+
+                st.write(
+                    "Not available"
+                )
+
+
+            st.markdown(
+                '<div class="small-title">Matched Skills</div>',
+                unsafe_allow_html=True
+            )
+
+
+            matched = selected_job.get(
+                "matched_skills",
+                []
+            )
+
+
+            if matched:
+
+                for skill in matched:
+
+                    st.markdown(
+                        f"""
+                        <span class="skill-box">
+                            {skill}
+                        </span>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
             else:
 
@@ -632,17 +1418,31 @@ for index, tab in enumerate(tabs):
                     "None"
                 )
 
-            st.write(
-                "Missing Skills:"
+
+            st.markdown(
+                '<div class="small-title">Missing Skills</div>',
+                unsafe_allow_html=True
             )
 
-            if selected_job["missing_skills"]:
 
-                st.write(
-                    ", ".join(
-                        selected_job["missing_skills"]
+            missing = selected_job.get(
+                "missing_skills",
+                []
+            )
+
+
+            if missing:
+
+                for skill in missing:
+
+                    st.markdown(
+                        f"""
+                        <span class="missing-box">
+                            {skill}
+                        </span>
+                        """,
+                        unsafe_allow_html=True
                     )
-                )
 
             else:
 
@@ -651,17 +1451,25 @@ for index, tab in enumerate(tabs):
                 )
 
 
-            # ---------------------------------------------
-            # AI GAP EXPLANATION
-            # ---------------------------------------------
+        # =================================================
+        # AI EXPLANATION
+        # =================================================
 
-            explain_key = (
-                f"explain_{index}_{selected_index}"
+        if jobs:
+
+            st.markdown(
+                '<div class="section-title">AI Skill Gap Explanation</div>',
+                unsafe_allow_html=True
             )
+
 
             if st.button(
-                "Generate AI Skill Gap Explanation",
-                key=explain_key
+                "Generate Explanation",
+                key=(
+                    f"explanation_"
+                    f"{candidate_index}_"
+                    f"{selected_job_index}"
+                )
             ):
 
                 with st.spinner(
@@ -672,8 +1480,12 @@ for index, tab in enumerate(tabs):
 
                         explanation = explain_gap(
                             selected_job["title"],
-                            selected_job["matched_skills"],
-                            selected_job["missing_skills"]
+                            selected_job[
+                                "matched_skills"
+                            ],
+                            selected_job[
+                                "missing_skills"
+                            ]
                         )
 
                         st.write(
@@ -683,58 +1495,32 @@ for index, tab in enumerate(tabs):
                     except Exception as error:
 
                         st.error(
-                            f"Could not generate explanation: {error}"
+                            f"Could not generate explanation: "
+                            f"{error}"
                         )
 
 
-            # ---------------------------------------------
-            # TRAINING PATH
-            # ---------------------------------------------
+        # =================================================
+        # TRAINING
+        # =================================================
 
-            st.subheader(
-                "Training Path"
-            )
+        st.markdown(
+            '<div class="section-title">Training Recommendation</div>',
+            unsafe_allow_html=True
+        )
 
-            missing_skills = selected_job.get(
-                "missing_skills",
-                []
-            )
 
-            if missing_skills:
+        if jobs:
+
+            if missing:
 
                 courses = recommend_courses(
-                    missing_skills,
+                    missing,
                     free_only=free_only
                 )
 
+
                 if courses:
-
-                    course_rows = []
-
-                    for course in courses:
-
-                        course_rows.append(
-                            {
-                                "Missing Skill": course["skill"],
-                                "Course": course["course"],
-                                "Provider": course["provider"],
-                                "Duration": (
-                                    f"{course['duration_weeks']} weeks"
-                                ),
-                                "Cost": course["cost"],
-                                "Level": course["level"]
-                            }
-                        )
-
-                    course_dataframe = pd.DataFrame(
-                        course_rows
-                    )
-
-                    st.dataframe(
-                        course_dataframe,
-                        use_container_width=True,
-                        hide_index=True
-                    )
 
                     total_weeks, total_cost = (
                         calculate_time_and_cost(
@@ -742,16 +1528,21 @@ for index, tab in enumerate(tabs):
                         )
                     )
 
-                    time_col1, time_col2 = st.columns(2)
 
-                    with time_col1:
+                    training_metric1, training_metric2 = (
+                        st.columns(2)
+                    )
+
+
+                    with training_metric1:
 
                         st.metric(
                             "Time to Ready",
                             f"{total_weeks} weeks"
                         )
 
-                    with time_col2:
+
+                    with training_metric2:
 
                         st.metric(
                             "Total Training Cost",
@@ -759,71 +1550,107 @@ for index, tab in enumerate(tabs):
                         )
 
 
-                    st.write(
-                        "Courses required to close the identified skill gaps:"
-                    )
-
                     for course in courses:
 
-                        st.write(
-                            f"{course['course']} "
-                            f"by {course['provider']}"
+                        st.markdown(
+                            f"""
+                            <div class="training-card">
+                                <div class="training-title">
+                                    {course['course']}
+                                </div>
+                                <div class="training-detail">
+                                    Provider:
+                                    {course['provider']}
+                                </div>
+                                <div class="training-detail">
+                                    Skill:
+                                    {course['skill']}
+                                </div>
+                                <div class="training-detail">
+                                    Duration:
+                                    {course['duration_weeks']}
+                                    weeks
+                                </div>
+                                <div class="training-detail">
+                                    Cost:
+                                    Rs {course['cost']}
+                                </div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
                         )
 
-                        st.write(
-                            f"Skill: {course['skill']}"
-                        )
 
-                        st.write(
-                            f"Duration: "
-                            f"{course['duration_weeks']} weeks"
-                        )
+                        course_url = str(
+                            course.get(
+                                "url",
+                                ""
+                            )
+                        ).strip()
 
-                        st.write(
-                            f"Cost: Rs {course['cost']}"
-                        )
 
-                        if course["url"]:
+                        if (
+                            course_url
+                            and course_url.lower()
+                            not in [
+                                "nan",
+                                "none",
+                                "null",
+                                ""
+                            ]
+                            and "example.com"
+                            not in course_url.lower()
+                        ):
 
-                            st.write(
-                                f"Course Link: {course['url']}"
+                            st.link_button(
+                                "Open Course Source",
+                                course_url
                             )
 
-                        st.divider()
+                        else:
+
+                            st.caption(
+                                "Course source: Not available"
+                            )
+
 
                 else:
 
                     st.info(
-                        "No matching courses were found "
-                        "for the selected skill gaps."
+                        "No course was found for "
+                        "the selected missing skills."
                     )
+
 
             else:
 
                 st.success(
-                    "No missing skills were identified "
-                    "for this job."
+                    "No missing skills were identified."
                 )
 
 
-        # -------------------------------------------------
-        # OPPORTUNITY UNLOCK ENGINE
-        # -------------------------------------------------
+        # =================================================
+        # OPPORTUNITY UNLOCK
+        # =================================================
 
-        st.subheader(
-            "Opportunity Unlock Analysis"
+        st.markdown(
+            '<div class="section-title">Opportunity Unlock Analysis</div>',
+            unsafe_allow_html=True
         )
+
 
         unlock_data = opportunity_unlock(
             jobs,
             skills
         )
 
+
         if unlock_data:
 
             unlock_dataframe = pd.DataFrame(
                 unlock_data
             )
+
 
             skill_counts = (
                 unlock_dataframe
@@ -832,23 +1659,19 @@ for index, tab in enumerate(tabs):
                 .reset_index(
                     name="Additional Jobs"
                 )
+                .sort_values(
+                    "Additional Jobs",
+                    ascending=False
+                )
             )
 
-            skill_counts = skill_counts.sort_values(
-                "Additional Jobs",
-                ascending=False
-            )
-
-            st.write(
-                "Skills that appear as missing requirements "
-                "across the analyzed jobs:"
-            )
 
             st.dataframe(
                 skill_counts,
                 use_container_width=True,
                 hide_index=True
             )
+
 
         else:
 
@@ -858,69 +1681,76 @@ for index, tab in enumerate(tabs):
             )
 
 
-        # -------------------------------------------------
+        # =================================================
         # ROADMAP
-        # -------------------------------------------------
+        # =================================================
 
-        st.subheader(
-            "Personalized Learning Roadmap"
+        st.markdown(
+            '<div class="section-title">Personalized Learning Roadmap</div>',
+            unsafe_allow_html=True
         )
+
 
         if jobs:
 
             best_job = jobs[0]
 
-            roadmap_missing = best_job.get(
+            roadmap_skills = best_job.get(
                 "missing_skills",
                 []
             )
 
-            if roadmap_missing:
 
-                st.write(
-                    "Step 1: Learn the most important missing skills."
-                )
+            if roadmap_skills:
 
-                for skill_number, skill in enumerate(
-                    roadmap_missing[:3],
+                roadmap_steps = [
+                    "Learn the identified missing skills.",
+                    "Complete the recommended training.",
+                    "Build practical projects.",
+                    "Update the resume with demonstrated skills.",
+                    "Run the analysis again after learning."
+                ]
+
+
+                for number, step in enumerate(
+                    roadmap_steps,
                     start=1
                 ):
 
-                    st.write(
-                        f"{skill_number}. {skill}"
+                    st.markdown(
+                        f"""
+                        <div class="info-card">
+                            <div class="card-title">
+                                Step {number}
+                            </div>
+                            <div class="card-text">
+                                {step}
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
                     )
 
-                st.write(
-                    "Step 2: Complete the recommended courses."
-                )
-
-                st.write(
-                    "Step 3: Build projects using the newly learned skills."
-                )
-
-                st.write(
-                    "Step 4: Update the resume with demonstrated skills."
-                )
-
-                st.write(
-                    "Step 5: Re-run SkillGap AI to measure the updated profile."
-                )
 
             else:
 
-                st.write(
-                    "The candidate currently covers "
-                    "the identified requirements."
+                st.success(
+                    "No major skill gap was identified."
                 )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # CANDIDATE COMPARISON
-# ---------------------------------------------------------
+# =========================================================
 
-st.header("Candidate Comparison")
+st.markdown(
+    '<div class="section-title">Candidate Comparison</div>',
+    unsafe_allow_html=True
+)
+
 
 comparison_rows = []
+
 
 for candidate in st.session_state.candidates:
 
@@ -928,28 +1758,40 @@ for candidate in st.session_state.candidates:
 
     jobs = candidate["jobs"]
 
+
     name = profile.get(
         "name",
         ""
     )
 
-    if not name:
+
+    if not name.strip():
 
         name = candidate["filename"]
 
+
     if jobs:
 
-        average_score = sum(
+        highest_match = max(
             job["match_score"]
             for job in jobs
-        ) / len(jobs)
+        )
 
-        highest_score = jobs[0]["match_score"]
+
+        average_match = (
+            sum(
+                job["match_score"]
+                for job in jobs
+            )
+            / len(jobs)
+        )
 
     else:
 
-        average_score = 0
-        highest_score = 0
+        highest_match = 0
+
+        average_match = 0
+
 
     comparison_rows.append(
         {
@@ -958,37 +1800,34 @@ for candidate in st.session_state.candidates:
                 candidate["skills"]
             ),
             "Jobs Analyzed": len(jobs),
-            "Highest Match": round(
-                highest_score,
-                1
+            "Highest Match": (
+                f"{highest_match:.1f}%"
             ),
-            "Average Match": round(
-                average_score,
-                1
+            "Average Match": (
+                f"{average_match:.1f}%"
             )
         }
     )
 
 
-comparison_dataframe = pd.DataFrame(
-    comparison_rows
-)
-
 st.dataframe(
-    comparison_dataframe,
+    pd.DataFrame(
+        comparison_rows
+    ),
     use_container_width=True,
     hide_index=True
 )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # FOOTER
-# ---------------------------------------------------------
+# =========================================================
 
 st.divider()
 
-st.write(
-    "SkillGap AI converts resume information into "
-    "structured skills, job matches, skill gaps, "
-    "training paths, and time-to-ready estimates."
+st.caption(
+    "SkillGap AI uses information available in the "
+    "uploaded resumes, job dataset and course dataset. "
+    "Unavailable information is displayed as "
+    "Not available."
 )

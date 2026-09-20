@@ -2,15 +2,11 @@ import os
 import json
 
 from dotenv import load_dotenv
-
 from langchain_groq import ChatGroq
-from langchain_core.prompts import (
-    ChatPromptTemplate
-)
+from langchain_core.prompts import ChatPromptTemplate
 
-from utils.skill_normalizer import (
-    normalize_skills
-)
+from utils.skill_normalizer import normalize_skills
+
 
 load_dotenv()
 
@@ -54,11 +50,10 @@ def get_llm():
     )
 
 
-def extract_profile(
-    resume_text
-):
+def extract_profile(resume_text):
 
     llm = get_llm()
+
 
     prompt = ChatPromptTemplate.from_template(
         """
@@ -81,18 +76,31 @@ experience
 
 Rules:
 
-- Do not invent information.
-- Extract only information present in the resume.
-- If information is unavailable, use an empty list or empty string.
-- Put technical abilities in skills.
-- Put degrees and schools in education.
-- Put projects in projects.
-- Put certificates in certifications.
-- Put hobbies and career interests in interests.
-- Put internships and jobs in experience.
-- Return valid JSON only.
-- Do not use markdown.
-- Do not use code fences.
+Do not invent information.
+
+Extract only information that is present
+in the resume.
+
+If information is unavailable,
+use an empty list or empty string.
+
+Put technical abilities in skills.
+
+Put degrees and institutions in education.
+
+Put projects in projects.
+
+Put certificates in certifications.
+
+Put hobbies and career interests in interests.
+
+Put internships and jobs in experience.
+
+Return valid JSON only.
+
+Do not use markdown.
+
+Do not use code fences.
 
 Resume:
 
@@ -100,7 +108,9 @@ Resume:
 """
     )
 
+
     chain = prompt | llm
+
 
     response = chain.invoke(
         {
@@ -108,7 +118,9 @@ Resume:
         }
     )
 
+
     content = response.content.strip()
+
 
     content = content.replace(
         "```json",
@@ -121,6 +133,7 @@ Resume:
     )
 
     content = content.strip()
+
 
     try:
 
@@ -141,11 +154,13 @@ Resume:
             "experience": []
         }
 
+
     profile["skills"] = normalize_skills(
         profile.get(
             "skills",
             []
         )
     )
+
 
     return profile

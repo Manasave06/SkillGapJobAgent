@@ -4,26 +4,35 @@ def opportunity_unlock(
 ):
 
     current_skills = {
-        skill.lower().strip()
+        str(skill)
+        .lower()
+        .strip()
         for skill in current_skills
     }
 
+
     results = []
+
 
     for job in jobs:
 
         missing = {
-            skill.lower().strip()
+            str(skill)
+            .lower()
+            .strip()
             for skill in job.get(
                 "missing_skills",
                 []
             )
         }
 
+
         for skill in missing:
 
             if skill in current_skills:
+
                 continue
+
 
             results.append(
                 {
@@ -35,5 +44,6 @@ def opportunity_unlock(
                     ]
                 }
             )
+
 
     return results

@@ -1,6 +1,9 @@
 import pandas as pd
+
 from functools import lru_cache
+
 from sentence_transformers import SentenceTransformer
+
 from sklearn.metrics.pairwise import cosine_similarity
 
 from utils.skill_normalizer import normalize_skill
@@ -19,7 +22,7 @@ def load_jobs():
 
 
 # =========================================================
-# LOAD EMBEDDING MODEL ONLY ONCE
+# LOAD EMBEDDING MODEL ONCE
 # =========================================================
 
 @lru_cache(maxsize=1)
@@ -31,7 +34,7 @@ def load_embedding_model():
 
 
 # =========================================================
-# NORMALIZE SKILL LIST
+# PREPARE SKILLS
 # =========================================================
 
 def prepare_skills(skills):
@@ -65,53 +68,69 @@ def semantic_matches(
     required_skills
 ):
 
-    if not user_skills or not required_skills:
+    if not user_skills:
 
         return {}
 
+    if not required_skills:
+
+        return {}
+
+
     model = load_embedding_model()
+
 
     user_embeddings = model.encode(
         user_skills,
         normalize_embeddings=True
     )
 
+
     required_embeddings = model.encode(
         required_skills,
         normalize_embeddings=True
     )
+
 
     matrix = cosine_similarity(
         required_embeddings,
         user_embeddings
     )
 
+
     results = {}
 
-    for i, required in enumerate(
+
+    for index, required in enumerate(
         required_skills
     ):
 
-        best_index = matrix[i].argmax()
+        best_index = matrix[
+            index
+        ].argmax()
+
 
         best_score = float(
-            matrix[i][best_index]
+            matrix[index][best_index]
         )
+
 
         best_user_skill = user_skills[
             best_index
         ]
+
 
         results[required] = (
             best_user_skill,
             best_score
         )
 
+
     return results
 
 
 # =========================================================
-# MATCH ONE JOB
+# CALCULATE JOB MATCH
 # =========================================================
 
 def calculate_job_match(
@@ -124,13 +143,17 @@ def calculate_job_match(
         user_skills
     )
 
+
     required_skills = [
-        normalize_skill(skill.strip())
+        normalize_skill(
+            skill.strip()
+        )
         for skill in str(
             job["skills"]
         ).split(",")
         if skill.strip()
     ]
+
 
     required_skills = list(
         dict.fromkeys(
@@ -138,8 +161,9 @@ def calculate_job_match(
         )
     )
 
+
     # -----------------------------------------------------
-    # EXACT MATCH
+    # EXACT MATCHES
     # -----------------------------------------------------
 
     exact_matches = sorted(
@@ -148,8 +172,9 @@ def calculate_job_match(
         )
     )
 
+
     # -----------------------------------------------------
-    # SEMANTIC MATCH
+    # SEMANTIC MATCHES
     # -----------------------------------------------------
 
     semantic_data = semantic_matches(
@@ -157,7 +182,9 @@ def calculate_job_match(
         required_skills
     )
 
-    semantic_matches_list = []
+
+    semantic_match_list = []
+
 
     for required in required_skills:
 
@@ -167,34 +194,36 @@ def calculate_job_match(
         if required not in semantic_data:
             continue
 
+
         best_user_skill, score = (
             semantic_data[required]
         )
 
-        # High threshold so unrelated skills
-        # are not counted as matches.
+
+        # High threshold so that unrelated
+        # skills are not counted.
+
         if score >= 0.82:
 
-            semantic_matches_list.append(
+            semantic_match_list.append(
                 required
             )
 
+
     matched_skills = list(
         dict.fromkeys(
-            exact_matches +
-            semantic_matches_list
+            exact_matches
+            + semantic_match_list
         )
     )
 
-    # -----------------------------------------------------
-    # MISSING SKILLS
-    # -----------------------------------------------------
 
     missing_skills = [
         skill
         for skill in required_skills
         if skill not in matched_skills
     ]
+
 
     # -----------------------------------------------------
     # SKILL COVERAGE
@@ -204,13 +233,13 @@ def calculate_job_match(
 
         skill_coverage = (
             len(matched_skills)
-            /
-            len(required_skills)
+            / len(required_skills)
         ) * 100
 
     else:
 
         skill_coverage = 0
+
 
     # -----------------------------------------------------
     # LOCATION
@@ -223,9 +252,11 @@ def calculate_job_match(
         )
     )
 
+
     candidate_location = str(
         candidate_location or ""
     )
+
 
     if not candidate_location:
 
@@ -245,25 +276,43 @@ def calculate_job_match(
 
         location_fit = 50
 
+
     # -----------------------------------------------------
     # FINAL SCORE
-    # -----------------------------------------------------
-    #
-    # Skill coverage is the main factor.
-    # Location has a smaller effect.
-    #
-    # 90% skill coverage
-    # 10% location
-    #
-    # This prevents semantic similarity from
-    # artificially inflating the score.
     # -----------------------------------------------------
 
     final_score = (
         skill_coverage * 0.90
-        +
-        location_fit * 0.10
+        + location_fit * 0.10
     )
+
+
+    # -----------------------------------------------------
+    # URL
+    # -----------------------------------------------------
+
+    url = str(
+        job.get(
+            "url",
+            ""
+        )
+    ).strip()
+
+
+    if (
+        not url
+        or url.lower()
+        in [
+            "nan",
+            "none",
+            "null"
+        ]
+        or "example.com"
+        in url.lower()
+    ):
+
+        url = ""
+
 
     return {
         "job_id": job["job_id"],
@@ -285,10 +334,7 @@ def calculate_job_match(
         "required_skills": required_skills,
         "matched_skills": matched_skills,
         "missing_skills": missing_skills,
-        "url": job.get(
-            "url",
-            ""
-        )
+        "url": url
     }
 
 
@@ -305,6 +351,7 @@ def match_jobs(
 
     results = []
 
+
     for _, job in jobs.iterrows():
 
         result = calculate_job_match(
@@ -317,9 +364,11 @@ def match_jobs(
             result
         )
 
+
     results.sort(
         key=lambda x: x["match_score"],
         reverse=True
     )
+
 
     return results
